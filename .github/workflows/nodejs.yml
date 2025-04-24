@@ -20,56 +20,39 @@ jobs:
           echo "${{ secrets.EC2_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
-
       - name: Deploy to EC2 and run app
         run: |
           ssh -v -i ~/.ssh/id_rsa ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} << 'EOF'
             set -e
-            echo "✅ SSH connection established"
 
-            echo "➡️ Updating and installing packages..."
             sudo apt update -y && sudo apt install -y git curl nginx
-
-            echo "➡️ Installing Node.js..."
             curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
             sudo apt install -y nodejs
-
-            echo "➡️ Installing PM2..."
             sudo npm install -g pm2
-
-            echo "➡️ Configuring UFW and NGINX..."
             sudo ufw allow 3000 || true
             sudo ufw allow 'Nginx Full' || true
             sudo ufw --force enable || true
 
-            echo "➡️ Writing NGINX config..."
-            sudo bash -c 'cat > /etc/nginx/sites-available/default <<EOL
-            server {
+            echo "server {
               listen 80;
               location / {
                 proxy_pass http://localhost:3000;
                 proxy_http_version 1.1;
-                proxy_set_header Upgrade \\$http_upgrade;
-                proxy_set_header Connection "upgrade";
-                proxy_set_header Host \\$host;
-                proxy_cache_bypass \\$http_upgrade;
+                proxy_set_header Upgrade \$http_upgrade;
+                proxy_set_header Connection \"upgrade\";
+                proxy_set_header Host \$host;
+                proxy_cache_bypass \$http_upgrade;
               }
-            }
-            EOL'
+            }" | sudo tee /etc/nginx/sites-available/default > /dev/null
 
             sudo systemctl restart nginx
 
-            echo "➡️ Deploying Node.js app..."
             pm2 delete all || true
             rm -rf ~/myapp || true
             git clone https://github.com/${{ github.repository }}.git ~/myapp
             cd ~/myapp/nodejs
             npm install
-
-            echo "➡️ Starting app with PM2..."
             pm2 start index.js --name "node-app"
             pm2 save
             pm2 startup systemd -u $USER --hp $HOME
-
-            echo "✅ Deployment complete"
           EOF
