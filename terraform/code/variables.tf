@@ -20,15 +20,6 @@ variable "AWS_SECRET_ACCESS_KEY" {
 
 
 
-variable "ecs_execution_name" {
-  type        = string
-}
-
-
-variable "ecs_task_name" {
-  type        = string
-}
-
 variable "sg_name" {
   type        = string
 }
