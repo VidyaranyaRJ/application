@@ -12,7 +12,6 @@ module "ec2" {
   source                                 = "../modules/ec2"
   subnet                                 = module.network.subnet_id
   sg_id                                  = module.network.security_group_id
-
 }
 
 
