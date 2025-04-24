@@ -77,6 +77,7 @@
 
 
 
+
 name: Clean EC2 on Push
 
 on:
@@ -86,44 +87,52 @@ on:
 
 jobs:
   cleanup:
+    name: Cleanup EC2 Instance
     runs-on: ubuntu-latest
 
     steps:
-      - name: Set up SSH access
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up SSH access with debug logs
         run: |
+          echo "📁 Creating SSH folder..."
           mkdir -p ~/.ssh
-          printf "%s\n" "${{ secrets.EC2_KEY }}" > ~/.ssh/id_rsa
+
+          echo "🔐 Writing PEM key to id_rsa..."
+          echo "${{ secrets.EC2_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
+
+          echo "🔒 Setting permissions on PEM key..."
           chmod 600 ~/.ssh/id_rsa
+
+          echo "📄 Checking key content (first 2 lines):"
+          head -n 2 ~/.ssh/id_rsa || echo "❌ PEM key content is invalid or missing!"
+
+          echo "📡 Adding EC2 host to known_hosts..."
           ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
 
-      - name: SSH and clean EC2
+      - name: SSH into EC2 and clean environment
         run: |
-          ssh -i ~/.ssh/id_rsa ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} << 'EOF'
+          echo "🚀 Connecting to EC2 and cleaning up..."
+          ssh -vvv -i ~/.ssh/id_rsa ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} << 'EOF'
             set -e
-            echo "🚨 Cleaning up EC2 instance on push..."
 
-            # Stop and remove PM2 apps
-            pm2 delete all || true
-            pm2 unstartup || true
+            echo "🔍 Running cleanup on EC2 instance..."
 
-            # Remove app directory
-            rm -rf ~/myapp
+            echo "🧹 Stopping PM2 processes (if any)..."
+            pm2 delete all || echo "No PM2 apps found"
 
-            # Remove Node.js & PM2
-            sudo apt remove --purge -y nodejs
-            sudo npm uninstall -g pm2 || true
+            echo "🗑️ Removing PM2..."
+            sudo npm uninstall -g pm2 || echo "PM2 not installed"
 
-            # Remove NGINX
-            sudo apt remove --purge -y nginx
-            sudo rm -rf /etc/nginx
+            echo "🗑️ Removing Node.js..."
+            sudo apt-get remove -y nodejs || echo "Node.js not found"
 
-            # Reset firewall
-            sudo ufw disable || true
-            sudo ufw reset || true
+            echo "🗑️ Removing NGINX..."
+            sudo apt-get remove -y nginx || echo "NGINX not found"
 
-            # Clean apt
-            sudo apt autoremove -y
-            sudo apt clean
+            echo "🧽 Removing app folder..."
+            rm -rf ~/myapp || echo "App folder not found"
 
-            echo "✅ Cleanup complete"
+            echo "✅ EC2 cleanup completed."
           EOF
