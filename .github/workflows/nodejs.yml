@@ -74,28 +74,33 @@
 #             echo "✅ Deployment complete"
 #           EOF
 
-name: Clean EC2 Setup
+
+
+
+name: Clean EC2 on Push
 
 on:
-  workflow_dispatch:  # Manual trigger, you can change to `push` if needed
+  push:
+    branches:
+      - main
 
 jobs:
   cleanup:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Set up SSH
+      - name: Set up SSH access
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.EC2_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
 
-      - name: SSH and clean everything
+      - name: SSH and clean EC2
         run: |
           ssh -i ~/.ssh/id_rsa ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} << 'EOF'
             set -e
-            echo "🧹 Cleaning EC2 instance..."
+            echo "🚨 Cleaning up EC2 instance on push..."
 
             # Stop and remove PM2 apps
             pm2 delete all || true
@@ -120,5 +125,5 @@ jobs:
             sudo apt autoremove -y
             sudo apt clean
 
-            echo "✅ EC2 instance cleaned."
+            echo "✅ Cleanup complete"
           EOF
