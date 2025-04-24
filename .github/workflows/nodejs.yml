@@ -74,85 +74,51 @@
 #             echo "✅ Deployment complete"
 #           EOF
 
-
-
-name: Deploy Node.js App to EC2 with PM2 and NGINX
+name: Clean EC2 Setup
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:  # Manual trigger, you can change to `push` if needed
 
 jobs:
-  deploy:
-    name: Deploy to EC2
+  cleanup:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Set up SSH access
+      - name: Set up SSH
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.EC2_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Reset EC2 and deploy app
+      - name: SSH and clean everything
         run: |
-          ssh -v -i ~/.ssh/id_rsa ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} << 'EOF'
+          ssh -i ~/.ssh/id_rsa ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} << 'EOF'
             set -e
-            echo "✅ SSH connection established"
+            echo "🧹 Cleaning EC2 instance..."
 
-            echo "🧹 Cleaning up previous installations..."
-            sudo systemctl stop nginx || true
-            sudo systemctl disable nginx || true
-            sudo apt remove --purge -y nginx nodejs || true
+            # Stop and remove PM2 apps
+            pm2 delete all || true
+            pm2 unstartup || true
+
+            # Remove app directory
+            rm -rf ~/myapp
+
+            # Remove Node.js & PM2
+            sudo apt remove --purge -y nodejs
             sudo npm uninstall -g pm2 || true
-            sudo apt autoremove -y || true
-            sudo rm -rf /etc/nginx /etc/nginx/sites-available/default
-            rm -rf ~/myapp || true
 
-            echo "➡️ Updating and installing packages..."
-            sudo apt update -y && sudo apt install -y git curl nginx
+            # Remove NGINX
+            sudo apt remove --purge -y nginx
+            sudo rm -rf /etc/nginx
 
-            echo "➡️ Installing Node.js..."
-            curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-            sudo apt install -y nodejs
+            # Reset firewall
+            sudo ufw disable || true
+            sudo ufw reset || true
 
-            echo "➡️ Installing PM2..."
-            sudo npm install -g pm2
+            # Clean apt
+            sudo apt autoremove -y
+            sudo apt clean
 
-            echo "➡️ Configuring UFW and NGINX..."
-            sudo ufw allow 3000 || true
-            sudo ufw allow 'Nginx Full' || true
-            sudo ufw --force enable || true
-
-            echo "➡️ Writing NGINX config..."
-            echo 'server {
-              listen 80;
-              location / {
-                proxy_pass http://localhost:3000;
-                proxy_http_version 1.1;
-                proxy_set_header Upgrade \$http_upgrade;
-                proxy_set_header Connection "upgrade";
-                proxy_set_header Host \$host;
-                proxy_cache_bypass \$http_upgrade;
-              }
-            }' | sudo tee /etc/nginx/sites-available/default > /dev/null
-
-            sudo systemctl restart nginx
-
-            echo "➡️ Deploying Node.js app..."
-            git clone https://github.com/${{ github.repository }}.git ~/myapp
-            cd ~/myapp/nodejs
-            npm install
-
-            echo "➡️ Starting app with PM2..."
-            pm2 start index.js --name "node-app"
-            pm2 save
-            pm2 startup systemd -u $USER --hp $HOME
-
-            echo "✅ Deployment complete"
+            echo "✅ EC2 instance cleaned."
           EOF
