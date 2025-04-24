@@ -1,4 +1,4 @@
-/nodejs/node_modules
-/Include
-/Lib
-/Scripts
+/nodejs/node_modules/
+/lnclude/
+/Lib/
+/Scripts/
