@@ -23,24 +23,26 @@ jobs:
 
       - name: Deploy to EC2 and run app
         run: |
-          ssh -i ~/.ssh/id_rsa ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} << 'EOF'
-            # Update and install system packages
-            sudo apt update -y
-            sudo apt install -y git curl nginx
+          ssh -v -i ~/.ssh/id_rsa ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} << 'EOF'
+            set -e
+            echo "✅ SSH connection established"
 
-            # Install Node.js (latest stable LTS version)
+            echo "➡️ Updating and installing packages..."
+            sudo apt update -y && sudo apt install -y git curl nginx
+
+            echo "➡️ Installing Node.js..."
             curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
             sudo apt install -y nodejs
 
-            # Install PM2 globally
+            echo "➡️ Installing PM2..."
             sudo npm install -g pm2
 
-            # Allow Node.js traffic on port 3000
-            sudo ufw allow 3000
+            echo "➡️ Configuring UFW and NGINX..."
+            sudo ufw allow 3000 || true
             sudo ufw allow 'Nginx Full' || true
-            sudo ufw --force enable
+            sudo ufw --force enable || true
 
-            # Set up NGINX reverse proxy to Node.js
+            echo "➡️ Writing NGINX config..."
             sudo bash -c 'cat > /etc/nginx/sites-available/default <<EOL
             server {
               listen 80;
@@ -57,17 +59,17 @@ jobs:
 
             sudo systemctl restart nginx
 
-            # Kill existing app (if any) and remove previous copy
+            echo "➡️ Deploying Node.js app..."
             pm2 delete all || true
-            rm -rf ~/myapp
-
-            # Clone and deploy app
+            rm -rf ~/myapp || true
             git clone https://github.com/${{ github.repository }}.git ~/myapp
             cd ~/myapp/nodejs
             npm install
 
-            # Start app with PM2 on port 3000
+            echo "➡️ Starting app with PM2..."
             pm2 start index.js --name "node-app"
             pm2 save
             pm2 startup systemd -u $USER --hp $HOME
+
+            echo "✅ Deployment complete"
           EOF
