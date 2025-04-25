@@ -27,20 +27,20 @@ jobs:
           ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
 
           echo "📦 Creating archive from repo..."
-          tar -czf app.tar.gz .
+          tar --warning=no-file-changed -czf app.tar.gz .
 
           echo "🚀 Transferring files to EC2..."
-          scp -i ~/.ssh/id_rsa app.tar.gz ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }}:/home/${{ secrets.EC2_USERNAME }}
+          scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no app.tar.gz ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }}:/home/${{ secrets.EC2_USERNAME }}
 
           echo "🔧 Connecting and running deployment..."
-          ssh -i ~/.ssh/id_rsa ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} << 'EOF'
+          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} << 'EOF'
             set -e
 
             echo "📦 Updating system..."
             sudo apt update -y
             sudo apt install -y git curl nginx
 
-            echo "📦 Installing Node.js..."
+            echo "🔧 Installing Node.js..."
             curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
             sudo apt install -y nodejs
 
