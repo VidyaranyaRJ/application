@@ -19,8 +19,9 @@ jobs:
           echo "📁 Creating SSH directory..."
           mkdir -p ~/.ssh
 
-          echo "🔐 Writing PEM key from base64..."
-          echo "${{ secrets.EC2_KEY }}" | base64 -d > ~/.ssh/id_rsa
+          echo "🔐 Writing SSH key..."
+          # Write the key directly without base64 decoding
+          echo "${{ secrets.EC2_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
 
           echo "🔑 Adding EC2 host to known_hosts..."
