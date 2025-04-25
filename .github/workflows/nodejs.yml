@@ -1,0 +1,79 @@
+name: Deploy Node.js App to EC2
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Install & Start Node.js App on EC2
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup SSH and Deploy
+        run: |
+          echo "📁 Creating SSH directory..."
+          mkdir -p ~/.ssh
+
+          echo "🔐 Adding private key..."
+          echo "${{ secrets.EC2_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+
+          echo "🔑 Adding EC2 host to known_hosts..."
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+          echo "🚀 Connecting and setting up environment..."
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} << 'EOF'
+            set -e
+
+            echo "📦 Updating packages..."
+            sudo apt update -y
+            sudo apt install -y git curl nginx
+
+            echo "🔧 Installing Node.js..."
+            curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+            sudo apt install -y nodejs
+
+            echo "🚀 Installing PM2..."
+            sudo npm install -g pm2
+
+            echo "🧼 Cleaning up old app..."
+            pm2 delete all || true
+            rm -rf ~/myapp || true
+
+            echo "📥 Cloning new app..."
+            git clone https://github.com/${{ github.repository }}.git ~/myapp
+            cd ~/myapp/nodejs
+
+            echo "📦 Installing dependencies..."
+            npm install
+
+            echo "🔁 Starting app with PM2..."
+            pm2 start index.js --name "node-app"
+            pm2 save
+            pm2 startup systemd -u $USER --hp $HOME
+
+            echo "🌐 Configuring NGINX reverse proxy..."
+            sudo bash -c 'cat > /etc/nginx/sites-available/default <<EOL
+            server {
+              listen 80;
+              location / {
+                proxy_pass http://localhost:3000;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade \$http_upgrade;
+                proxy_set_header Connection "upgrade";
+                proxy_set_header Host \$host;
+                proxy_cache_bypass \$http_upgrade;
+              }
+            }
+            EOL'
+
+            echo "🔄 Restarting NGINX..."
+            sudo systemctl restart nginx
+
+            echo "✅ Deployment completed successfully!"
+          EOF
