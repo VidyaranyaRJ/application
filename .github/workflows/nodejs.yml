@@ -26,10 +26,15 @@ jobs:
           echo "🔑 Adding EC2 host to known_hosts..."
           ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
 
-          echo "🚀 Connecting and setting up environment..."
+          echo "📦 Creating archive from repo..."
+          tar -czf app.tar.gz .
+
+          echo "🚀 Transferring files to EC2..."
+          scp -i ~/.ssh/id_rsa app.tar.gz ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }}:/home/${{ secrets.EC2_USERNAME }}/
+
+          echo "🚀 Connecting to EC2 and running deployment..."
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} << 'EOF'
             set -e
-
             echo "📦 Updating packages..."
             sudo apt update -y
             sudo apt install -y git curl nginx
@@ -45,11 +50,13 @@ jobs:
             pm2 delete all || true
             rm -rf ~/myapp || true
 
-            echo "📥 Cloning new app..."
-            git clone https://github.com/${{ github.repository }}.git ~/myapp
-            cd ~/myapp/nodejs
+            echo "📥 Extracting new app..."
+            mkdir -p ~/myapp
+            tar -xzf app.tar.gz -C ~/myapp
+            rm app.tar.gz
 
-            echo "📦 Installing dependencies..."
+            echo "📦 Installing app dependencies..."
+            cd ~/myapp/nodejs
             npm install
 
             echo "🔁 Starting app with PM2..."
