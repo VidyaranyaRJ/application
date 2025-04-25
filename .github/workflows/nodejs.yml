@@ -19,8 +19,8 @@ jobs:
           echo "📁 Creating SSH directory..."
           mkdir -p ~/.ssh
 
-          echo "🔐 Adding private key..."
-          echo "${{ secrets.EC2_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
+          echo "🔐 Writing PEM key from base64..."
+          echo "${{ secrets.EC2_KEY_BASE64 }}" | base64 -d > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
 
           echo "🔑 Adding EC2 host to known_hosts..."
@@ -30,23 +30,24 @@ jobs:
           tar -czf app.tar.gz .
 
           echo "🚀 Transferring files to EC2..."
-          scp -i ~/.ssh/id_rsa app.tar.gz ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }}:/home/${{ secrets.EC2_USERNAME }}/
+          scp -i ~/.ssh/id_rsa app.tar.gz ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }}:/home/${{ secrets.EC2_USERNAME }}
 
-          echo "🚀 Connecting to EC2 and running deployment..."
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} << 'EOF'
+          echo "🔧 Connecting and running deployment..."
+          ssh -i ~/.ssh/id_rsa ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} << 'EOF'
             set -e
-            echo "📦 Updating packages..."
+
+            echo "📦 Updating system..."
             sudo apt update -y
             sudo apt install -y git curl nginx
 
-            echo "🔧 Installing Node.js..."
+            echo "📦 Installing Node.js..."
             curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
             sudo apt install -y nodejs
 
             echo "🚀 Installing PM2..."
             sudo npm install -g pm2
 
-            echo "🧼 Cleaning up old app..."
+            echo "🧼 Cleaning old app..."
             pm2 delete all || true
             rm -rf ~/myapp || true
 
@@ -55,7 +56,7 @@ jobs:
             tar -xzf app.tar.gz -C ~/myapp
             rm app.tar.gz
 
-            echo "📦 Installing app dependencies..."
+            echo "📦 Installing dependencies..."
             cd ~/myapp/nodejs
             npm install
 
@@ -64,7 +65,7 @@ jobs:
             pm2 save
             pm2 startup systemd -u $USER --hp $HOME
 
-            echo "🌐 Configuring NGINX reverse proxy..."
+            echo "🌐 Configuring NGINX..."
             sudo bash -c 'cat > /etc/nginx/sites-available/default <<EOL
             server {
               listen 80;
@@ -79,8 +80,6 @@ jobs:
             }
             EOL'
 
-            echo "🔄 Restarting NGINX..."
             sudo systemctl restart nginx
-
-            echo "✅ Deployment completed successfully!"
+            echo "✅ Deployment complete"
           EOF
