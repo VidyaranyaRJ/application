@@ -1,3 +1,91 @@
+# name: Destroy and Recreate Node.js App on EC2
+
+# on:
+#   push:
+#     branches:
+#       - main
+#   workflow_dispatch:
+#     inputs:
+#       force_rebuild:
+#         description: 'Force complete rebuild'
+#         required: false
+#         default: 'false'
+#         type: boolean
+
+# jobs:
+#   deploy:
+#     name: Destroy and Recreate on EC2
+#     runs-on: ubuntu-latest
+
+#     steps:
+#       - name: Checkout code
+#         uses: actions/checkout@v3
+
+#       - name: Deploy to EC2
+#         uses: appleboy/ssh-action@master
+#         with:
+#           host: ${{ secrets.EC2_HOST }}
+#           username: ${{ secrets.EC2_USERNAME }}
+#           key: ${{ secrets.EC2_KEY }}
+#           script: |
+#             echo "🛑 Stopping and removing existing services..."
+#             # Stop PM2 processes
+#             pm2 stop all || true
+#             pm2 delete all || true
+            
+#             # Stop nginx
+#             sudo systemctl stop nginx || true
+            
+#             # Clean old application
+#             echo "🧹 Removing old application files..."
+#             rm -rf ~/myapp || true
+            
+#             echo "📦 Updating system packages..."
+#             sudo apt update -y
+#             sudo apt install -y git curl nginx
+            
+#             echo "🔧 Installing/Updating Node.js..."
+#             curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+#             sudo apt install -y nodejs
+            
+#             echo "🚀 Installing PM2..."
+#             sudo npm install -g pm2
+            
+#             echo "📥 Cloning repository..."
+#             git clone -b main https://github.com/VidyaranyaRJ/application.git ~/myapp
+            
+#             echo "📦 Installing dependencies..."
+#             cd ~/myapp/nodejs
+#             npm install
+            
+#             echo "🔁 Starting app with PM2..."
+#             pm2 start index.js --name "node-app"
+#             pm2 save
+#             pm2 startup systemd -u $USER --hp $HOME
+#             sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u $USER --hp $HOME
+            
+#             echo "🌐 Configuring NGINX..."
+#             sudo bash -c 'cat > /etc/nginx/sites-available/default <<EOL
+#             server {
+#               listen 80;
+#               location / {
+#                 proxy_pass http://localhost:3000;
+#                 proxy_http_version 1.1;
+#                 proxy_set_header Upgrade \$http_upgrade;
+#                 proxy_set_header Connection "upgrade";
+#                 proxy_set_header Host \$host;
+#                 proxy_cache_bypass \$http_upgrade;
+#               }
+#             }
+#             EOL'
+            
+#             echo "🔄 Restarting services..."
+#             sudo systemctl restart nginx
+            
+#             echo "✅ Destruction and recreation complete"
+
+
+
 name: Destroy and Recreate Node.js App on EC2
 
 on:
@@ -28,44 +116,38 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_KEY }}
           script: |
-            echo "🛑 Stopping and removing existing services..."
-            # Stop PM2 processes
+            echo "🛑 Stopping and cleaning existing app..."
             pm2 stop all || true
             pm2 delete all || true
-            
-            # Stop nginx
             sudo systemctl stop nginx || true
-            
-            # Clean old application
-            echo "🧹 Removing old application files..."
             rm -rf ~/myapp || true
-            
+
             echo "📦 Updating system packages..."
             sudo apt update -y
             sudo apt install -y git curl nginx
-            
-            echo "🔧 Installing/Updating Node.js..."
+
+            echo "🔧 Installing Node.js and PM2..."
             curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
             sudo apt install -y nodejs
-            
-            echo "🚀 Installing PM2..."
             sudo npm install -g pm2
-            
-            echo "📥 Cloning repository..."
+
+            echo "📥 Cloning repo and installing dependencies..."
             git clone -b main https://github.com/VidyaranyaRJ/application.git ~/myapp
-            
-            echo "📦 Installing dependencies..."
             cd ~/myapp/nodejs
             npm install
-            
-            echo "🔁 Starting app with PM2..."
+
+            echo "🚀 Starting app with PM2 and configuring startup..."
             pm2 start index.js --name "node-app"
             pm2 save
+
+            # Fix PM2 startup to persist after reboot
+            pm2 unstartup systemd || true
             pm2 startup systemd -u $USER --hp $HOME
-            sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u $USER --hp $HOME
-            
-            echo "🌐 Configuring NGINX..."
-            sudo bash -c 'cat > /etc/nginx/sites-available/default <<EOL
+            sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u $USER --hp $HOME
+            pm2 save
+
+            echo "🌐 Setting up NGINX reverse proxy..."
+            sudo tee /etc/nginx/sites-available/default > /dev/null <<EOL
             server {
               listen 80;
               location / {
@@ -77,9 +159,9 @@ jobs:
                 proxy_cache_bypass \$http_upgrade;
               }
             }
-            EOL'
-            
-            echo "🔄 Restarting services..."
+            EOL
+
+            echo "🔄 Restarting NGINX..."
             sudo systemctl restart nginx
-            
-            echo "✅ Destruction and recreation complete"
+
+            echo "✅ Deployment completed and app will restart automatically on reboot."
