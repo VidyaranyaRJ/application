@@ -37,7 +37,7 @@ jobs:
             rm -rf ~/myapp || true
 
             echo "📥 Cloning repository..."
-            git clone https://github.com/VidyaranyaRJ/application.git ~/myapp
+            git clone https://github.com/VidyaranyaRJ/application/tree/main.git ~/myapp
             
             echo "📦 Installing dependencies..."
             cd ~/myapp/nodejs
