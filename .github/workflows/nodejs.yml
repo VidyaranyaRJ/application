@@ -7,36 +7,20 @@ on:
 
 jobs:
   deploy:
-    name: Start Node.js App on EC2
+    name: Deploy to EC2
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Setup SSH and Deploy
-        run: |
-          echo "📁 Creating SSH directory..."
-          mkdir -p ~/.ssh
-
-          echo "🔐 Writing SSH key..."
-          # Write the key directly without base64 decoding
-          echo "${{ secrets.EC2_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-
-          echo "🔑 Adding EC2 host to known_hosts..."
-          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
-
-          echo "📦 Creating archive from repo..."
-          tar --warning=no-file-changed -czf app.tar.gz .
-
-          echo "🚀 Transferring files to EC2..."
-          scp -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no app.tar.gz ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }}:/home/${{ secrets.EC2_USERNAME }}
-
-          echo "🔧 Connecting and running deployment..."
-          ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no ${{ secrets.EC2_USERNAME }}@${{ secrets.EC2_HOST }} << 'EOF'
-            set -e
-
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
             echo "📦 Updating system..."
             sudo apt update -y
             sudo apt install -y git curl nginx
@@ -52,11 +36,9 @@ jobs:
             pm2 delete all || true
             rm -rf ~/myapp || true
 
-            echo "📥 Extracting new app..."
-            mkdir -p ~/myapp
-            tar -xzf app.tar.gz -C ~/myapp
-            rm app.tar.gz
-
+            echo "📥 Cloning repository..."
+            git clone https://github.com/VidyaranyaRJ/application.git ~/myapp
+            
             echo "📦 Installing dependencies..."
             cd ~/myapp/nodejs
             npm install
@@ -83,4 +65,3 @@ jobs:
 
             sudo systemctl restart nginx
             echo "✅ Deployment complete"
-          EOF
