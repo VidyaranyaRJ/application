@@ -23,7 +23,7 @@ pipeline {
 
                         bat "terraform init -input=false"
                         bat "terraform workspace select ${envName}"
-                        bat "terraform plan -input=false -out tfplan -var 'version=${version}' --var-file=/terraform.tfvars"
+                        bat "terraform plan -input=false -out tfplan -var 'version=${version}' --var-file=terraform.tfvars"
                         bat "terraform show -no-color tfplan > tfplan.txt"
                     }
             }
