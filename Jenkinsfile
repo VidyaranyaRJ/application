@@ -18,7 +18,7 @@ pipeline {
             steps {
                 dir('terraform/code'){
                 bat 'terraform init -input=false'
-                bat 'terraform workspace select ${environment}'
+                bat 'terraform workspace select ${params.environment}'
                 bat "terraform plan -input=false -out tfplan -var 'version=${params.version}' --var-file=environments/${params.environment}.tfvars"
                 bat 'terraform show -no-color tfplan > tfplan.txt'
             }
