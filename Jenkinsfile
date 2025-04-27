@@ -42,10 +42,29 @@ pipeline {
             }
         }
 
-        stage('Apply') {
+        // stage('Apply') {
+        //     steps {
+        //         dir('terraform/code') {
+        //             bat "terraform apply -input=false tfplan"
+        //         }
+        //     }
+        // }
+
+        stage('Destroy') {
+            when {
+                expression {
+                    return params.destroyInstead == true
+                }
+            }
             steps {
                 dir('terraform/code') {
-                    bat "terraform apply -input=false tfplan"
+                    input message: "Are you sure you want to destroy the infrastructure?"
+                    bat """
+                        terraform init -input=false
+                        terraform destroy -auto-approve --var-file=terraform.tfvars ^
+                            -var AWS_ACCESS_KEY_ID=%AWS_ACCESS_KEY_ID% ^
+                            -var AWS_SECRET_ACCESS_KEY=%AWS_SECRET_ACCESS_KEY%
+                    """
                 }
             }
         }
@@ -57,3 +76,6 @@ pipeline {
         }
     }
 }
+
+
+
