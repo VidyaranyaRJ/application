@@ -15,9 +15,13 @@ pipeline {
         stage('Plan') {
             steps {
                 dir('terraform/code') {
-                    bat "terraform init -input=false"
-                    bat "terraform plan -input=false -out=tfplan --var-file=terraform.tfvars"
-                    bat "terraform show -no-color tfplan > tfplan.txt"
+                    bat """
+                        terraform init -input=false
+                        terraform plan -input=false -out=tfplan --var-file=terraform.tfvars ^
+                            -var AWS_ACCESS_KEY_ID=%AWS_ACCESS_KEY_ID% ^
+                            -var AWS_SECRET_ACCESS_KEY=%AWS_SECRET_ACCESS_KEY%
+                        terraform show -no-color tfplan > tfplan.txt
+                    """
                 }
             }
         }
