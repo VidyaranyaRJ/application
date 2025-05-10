@@ -23,12 +23,12 @@ module "ec2" {
   source                                 = "../modules/ec2"
   subnet                                 = module.network.subnet_id
   sg_id                                  = module.network.security_group_id
-  ec2_name = locals.ec2_name
+  ec2_name = local.ec2_name
 }
 
 
 module "network" {
   source                                 = "../modules/network"
-  sg_name = locals.sg_name
+  sg_name = local.sg_name
 }
 
