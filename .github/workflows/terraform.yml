@@ -1,8 +1,82 @@
-name: Terraform QA Deployment
+# name: Terraform QA Deployment
+
+# on:
+#   push:
+#     branches: [ main ]  # Automatically deploy to QA on push
+
+# jobs:
+#   terraform:
+#     runs-on: ubuntu-latest
+#     defaults:
+#       run:
+#         working-directory: ./terraform/code/
+
+#     steps:
+#       - name: Checkout Repository
+#         uses: actions/checkout@v3
+
+#       - name: Setup Terraform
+#         uses: hashicorp/setup-terraform@v2
+#         with:
+#           terraform_version: 1.5.0
+
+#       - name: Configure AWS credentials
+#         uses: aws-actions/configure-aws-credentials@v2
+#         with:
+#           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#           aws-region: us-east-2
+
+#       - name: Verify AWS Access
+#         run: aws sts get-caller-identity
+
+#       - name: Terraform Init (QA Backend)
+#         run: |
+#           terraform init \
+#             -backend-config="bucket=vj-test-ecr-79" \
+#             -backend-config="key=qa/terraform.tfstate" \
+#             -backend-config="region=us-east-2" \
+#             -backend-config="encrypt=true"
+
+#       - name: Terraform Format Check
+#         run: terraform fmt -check
+#         continue-on-error: true
+
+#       - name: Terraform Validate
+#         run: terraform validate
+
+#       - name: Terraform Plan
+#         env:
+#           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#         run: terraform plan -input=false -var="environment=qa" -out=tfplan
+
+#       # - name: Terraform Apply
+#       #   env:
+#       #     AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#       #     AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#       #   run: terraform apply -auto-approve tfplan
+
+      # #Destroy resources
+      # - name: Terraform Destroy
+      #   run: |
+      #     echo "DESTROYING ALL RESOURCES!"
+      #     export TF_VAR_AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}"
+      #     export TF_VAR_AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+      #     terraform destroy -auto-approve
+      #   timeout-minutes: 12
+    
+
+
+
+name: Terraform Deployment
 
 on:
   push:
-    branches: [ main ]  # Automatically deploy to QA on push
+    branches: [ main ]  # Triggered automatically on push to main
+
+env:
+  ENVIRONMENT: prod  # <<< Set qa or prod here
 
 jobs:
   terraform:
@@ -30,11 +104,12 @@ jobs:
       - name: Verify AWS Access
         run: aws sts get-caller-identity
 
-      - name: Terraform Init (QA Backend)
+      - name: Terraform Init
         run: |
+          echo "Using environment: $ENVIRONMENT"
           terraform init \
             -backend-config="bucket=vj-test-ecr-79" \
-            -backend-config="key=qa/terraform.tfstate" \
+            -backend-config="key=${ENVIRONMENT}/terraform.tfstate" \
             -backend-config="region=us-east-2" \
             -backend-config="encrypt=true"
 
@@ -49,82 +124,10 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        run: terraform plan -input=false -var="environment=qa" -out=tfplan
+        run: terraform plan -input=false -var="environment=${ENVIRONMENT}" -out=tfplan
 
-      # - name: Terraform Apply
-      #   env:
-      #     AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      #     AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      #   run: terraform apply -auto-approve tfplan
-
-      #Destroy resources
-      - name: Terraform Destroy
-        run: |
-          echo "DESTROYING ALL RESOURCES!"
-          export TF_VAR_AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}"
-          export TF_VAR_AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}"
-          terraform destroy -auto-approve
-        timeout-minutes: 12
-    
-
-
-
-
-
-
-
-# name: Terraform Deployment
-
-# on:
-#   push:
-#     branches: [ main ]
-#   workflow_dispatch:
-#     inputs:
-#       environment:
-#         description: "Which environment to deploy to?"
-#         required: true
-#         type: choice
-#         default: "prod"
-#         options:
-#           - qa
-#           - prod
-
-# jobs:
-#   terraform:
-#     runs-on: ubuntu-latest
-#     defaults:
-#       run:
-#         working-directory: ./terraform/code/
-#     steps:
-#       - name: Checkout
-#         uses: actions/checkout@v3
-
-#       - name: Setup Terraform
-#         uses: hashicorp/setup-terraform@v2
-#         with:
-#           terraform_version: 1.5.0
-
-#       - name: Configure AWS credentials
-#         uses: aws-actions/configure-aws-credentials@v2
-#         with:
-#           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-#           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-#           aws-region: us-east-2
-
-#       - name: Terraform Init
-#         run: |
-#           ENV="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || 'qa' }}"
-#           echo "⚙️ Initializing backend for: $ENV"
-#           terraform init \
-#             -backend-config="bucket=vj-test-ecr-79" \
-#             -backend-config="key=${ENV}/terraform.tfstate" \
-#             -backend-config="region=us-east-2" \
-#             -backend-config="encrypt=true"
-
-#       - name: Terraform Plan
-#         run: |
-#           ENV="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || 'qa' }}"
-#           terraform plan -var="environment=$ENV" -out=tfplan
-
-#       - name: Terraform Apply
-#         run: terraform apply -auto-approve tfplan
+      - name: Terraform Apply
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: terraform apply -auto-approve tfplan
