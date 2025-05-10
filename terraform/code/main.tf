@@ -37,6 +37,7 @@ module "network" {
 
 module "elb" {
   source                                 = "../modules/elb"
-  elb_name = "elb-node"
+  elb_name = var.elb_name
   # instance_id = moduke.ec2.ec2_id
 }
+
