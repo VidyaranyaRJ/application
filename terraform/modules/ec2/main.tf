@@ -24,6 +24,8 @@ data "aws_iam_instance_profile" "ecs_profile" {
 
 ####################Auto scaling purpose###############
 
+
+
 resource "aws_launch_template" "ecs_launch_template" {
   name_prefix   = "ecs-lt-${var.ec2_name}"
   image_id      = "ami-0c3b809fcf2445b6a"
@@ -39,6 +41,53 @@ resource "aws_launch_template" "ecs_launch_template" {
     security_groups             = [var.sg_id]
   }
 
+  user_data = base64encode(<<EOF
+    #!/bin/bash
+    # Install system updates and tools
+    sudo apt update -y
+    sudo apt install -y git curl nginx
+
+    # Install Node.js 18 and PM2
+    curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+    sudo apt install -y nodejs
+    sudo npm install -g pm2
+
+    # Clone your app repo and install dependencies
+    cd /home/ubuntu
+    git clone -b main https://github.com/VidyaranyaRJ/application.git myapp
+    cd myapp/nodejs
+    npm install
+
+    # Start the app with PM2
+    pm2 start index.js --name "node-app"
+    pm2 save
+
+    # Make PM2 survive reboots
+    pm2 startup systemd -u ubuntu --hp /home/ubuntu
+    sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u ubuntu --hp /home/ubuntu
+    pm2 save
+
+    # Configure NGINX as reverse proxy (optional if using port 8000 directly)
+    sudo tee /etc/nginx/sites-available/default > /dev/null <<NGINX
+    server {
+      listen 80;
+      location / {
+        proxy_pass http://localhost:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_cache_bypass \$http_upgrade;
+      }
+    }
+    NGINX
+
+    # Restart NGINX
+    sudo systemctl restart nginx
+    EOF
+  )
+
+
   tag_specifications {
     resource_type = "instance"
     tags = {
@@ -46,6 +95,7 @@ resource "aws_launch_template" "ecs_launch_template" {
     }
   }
 }
+
 
 
 
