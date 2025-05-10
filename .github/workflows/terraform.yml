@@ -45,6 +45,13 @@ jobs:
     - name: Terraform Init with S3 Backend
       run: |
         ENV="${{ github.event.inputs.environment }}"
+        if [ -z "$ENV" ]; then
+          echo "❌ Environment input is missing."
+          exit 1
+        fi
+    
+        echo "⚙️  Initializing backend for environment: $ENV"
+    
         terraform init \
           -backend-config="bucket=vj-test-ecr-79" \
           -backend-config="key=${ENV}/terraform.tfstate" \
