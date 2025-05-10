@@ -2,18 +2,123 @@ data "aws_iam_instance_profile" "ecs_profile" {
   name = "vj-ecs-ec2-1"
 }
 
-resource "aws_instance" "ecs_instance" {
-  ami                         = "ami-0c3b809fcf2445b6a"
-  instance_type               = "t2.micro"
-  subnet_id                   = var.subnet
-  vpc_security_group_ids      = [var.sg_id]
-  iam_instance_profile        = data.aws_iam_instance_profile.ecs_profile.name
-  associate_public_ip_address = true
-  key_name                    = "vj-test"
+
+
+##################qa ###############
+
+# resource "aws_instance" "ecs_instance" {
+#   ami                         = "ami-0c3b809fcf2445b6a"
+#   instance_type               = "t2.micro"
+#   subnet_id                   = var.subnet
+#   vpc_security_group_ids      = [var.sg_id]
+#   iam_instance_profile        = data.aws_iam_instance_profile.ecs_profile.name
+#   associate_public_ip_address = true
+#   key_name                    = "vj-test"
+
+#   tags = {
+#     Name = var.ec2_name
+#   }
+# }
 
 
 
-  tags = {
-    Name = "ecs-instance-ubuntu"
+####################Auto scaling purpose###############
+
+
+
+resource "aws_launch_template" "ecs_launch_template" {
+  name_prefix   = "ecs-lt-${var.ec2_name}"
+  image_id      = "ami-0c3b809fcf2445b6a"
+  instance_type = "t2.micro"
+  key_name      = "vj-test"
+
+  iam_instance_profile {
+    name = data.aws_iam_instance_profile.ecs_profile.name
+  }
+
+  network_interfaces {
+    associate_public_ip_address = true
+    security_groups             = [var.sg_id]
+  }
+
+  user_data = base64encode(<<EOF
+    #!/bin/bash
+    # Install system updates and tools
+    sudo apt update -y
+    sudo apt install -y git curl nginx
+
+    # Install Node.js 18 and PM2
+    curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+    sudo apt install -y nodejs
+    sudo npm install -g pm2
+
+    # Clone your app repo and install dependencies
+    cd /home/ubuntu
+    git clone -b main https://github.com/VidyaranyaRJ/application.git myapp
+    cd myapp/nodejs
+    npm install
+
+    # Start the app with PM2
+    pm2 start index.js --name "node-app"
+    pm2 save
+
+    # Make PM2 survive reboots
+    pm2 startup systemd -u ubuntu --hp /home/ubuntu
+    sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u ubuntu --hp /home/ubuntu
+    pm2 save
+
+    # Configure NGINX as reverse proxy (optional if using port 8000 directly)
+    sudo tee /etc/nginx/sites-available/default > /dev/null <<NGINX
+    server {
+      listen 80;
+      location / {
+        proxy_pass http://localhost:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_cache_bypass \$http_upgrade;
+      }
+    }
+    NGINX
+
+    # Restart NGINX
+    sudo systemctl restart nginx
+    EOF
+  )
+
+
+  tag_specifications {
+    resource_type = "instance"
+    tags = {
+      Name = var.ec2_name
+    }
+  }
+}
+
+
+
+
+
+resource "aws_autoscaling_group" "ecs_asg" {
+  name_prefix          = "ecs-asg-${var.ec2_name}"
+  max_size             = 2
+  min_size             = 1
+  desired_capacity     = 1
+  vpc_zone_identifier  = [var.subnet]
+  health_check_type    = "EC2"
+  force_delete         = true
+
+  launch_template {
+    id      = aws_launch_template.ecs_launch_template.id
+    version = "$Latest"
+  }
+
+  load_balancers = [var.elb_ec2_name]
+
+  tag {
+    key                 = "Name"
+    value               = var.ec2_name
+    propagate_at_launch = true
   }
 }

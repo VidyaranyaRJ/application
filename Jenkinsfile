@@ -1,0 +1,155 @@
+// pipeline {
+//     agent any
+
+//     environment {
+//         AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
+//         AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
+//         TF_IN_AUTOMATION      = '1'
+//     }
+
+//     parameters {
+//         booleanParam(name: 'autoApprove', defaultValue: false, description: 'Automatically apply without manual approval?')
+//         booleanParam(name: 'destroyInstead', defaultValue: false, description: 'Destroy infrastructure instead of applying?')
+
+//     }
+
+//     stages {
+//         stage('Plan') {
+//             steps {
+//                 dir('terraform/code') {
+//                     bat """
+//                         terraform init -input=false
+//                         terraform plan -input=false -out=tfplan --var-file=terraform.tfvars ^
+//                             -var AWS_ACCESS_KEY_ID=%AWS_ACCESS_KEY_ID% ^
+//                             -var AWS_SECRET_ACCESS_KEY=%AWS_SECRET_ACCESS_KEY%
+//                         terraform show -no-color tfplan > tfplan.txt
+//                     """
+//                 }
+//             }
+//         }
+
+//         stage('Approval') {
+//             when {
+//                 not {
+//                     equals expected: true, actual: params.autoApprove
+//                 }
+//             }
+//             steps {
+//                 script {
+//                     def plan = readFile 'terraform/code/tfplan.txt'
+//                     input message: "Please review the plan before applying.", parameters: [
+//                         text(name: 'Terraform Plan', defaultValue: plan, description: 'Review the Terraform changes')
+//                     ]
+//                 }
+//             }
+//         }
+
+//         // stage('Apply') {
+//         //     steps {
+//         //         dir('terraform/code') {
+//         //             bat "terraform apply -input=false tfplan"
+//         //         }
+//         //     }
+//         // }
+
+//         stage('Destroy') {
+//             when {
+//                 expression {
+//                     return params.destroyInstead == true
+//                 }
+//             }
+//             steps {
+//                 dir('terraform/code') {
+//                     input message: "Are you sure you want to destroy the infrastructure?"
+//                     bat """
+//                         terraform init -input=false
+//                         terraform destroy -auto-approve --var-file=terraform.tfvars ^
+//                             -var AWS_ACCESS_KEY_ID=%AWS_ACCESS_KEY_ID% ^
+//                             -var AWS_SECRET_ACCESS_KEY=%AWS_SECRET_ACCESS_KEY%
+//                     """
+//                 }
+//             }
+//         }
+//     }
+
+//     post {
+//         always {
+//             archiveArtifacts artifacts: 'terraform/code/tfplan.txt'
+//         }
+//     }
+// }
+
+
+
+pipeline {
+    agent any
+
+    environment {
+        AWS_ACCESS_KEY_ID     = credentials('AWS_ACCESS_KEY_ID')
+        AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
+        TF_IN_AUTOMATION      = '1'
+    }
+
+    parameters {
+        booleanParam(name: 'autoApprove', defaultValue: true, description: 'Automatically approve plan and apply/destroy?')
+    }
+
+    stages {
+        stage('Plan') {
+            steps {
+                dir('terraform/code') {
+                    bat """
+                        terraform init -input=false
+                        terraform plan -input=false -out=tfplan --var-file=terraform.tfvars ^
+                            -var AWS_ACCESS_KEY_ID=%AWS_ACCESS_KEY_ID% ^
+                            -var AWS_SECRET_ACCESS_KEY=%AWS_SECRET_ACCESS_KEY%
+                        terraform show -no-color tfplan > tfplan.txt
+                    """
+                }
+            }
+        }
+
+        stage('Approval') {
+            steps {
+                script {
+                    if (!params.autoApprove) {
+                        def plan = readFile 'terraform/code/tfplan.txt'
+                        input message: "Please review and approve the Terraform Plan", parameters: [
+                            text(name: 'Terraform Plan', defaultValue: plan, description: 'Review the planned changes.')
+                        ]
+                    }
+                }
+            }
+        }
+
+        // --- APPLY stage ---
+        // stage('Apply') {
+        //     steps {
+        //         dir('terraform/code') {
+        //             bat "terraform apply -input=false tfplan"
+        //         }
+        //     }
+        // }
+
+        // --- DESTROY stage ---
+        stage('Destroy') {
+            steps {
+                dir('terraform/code') {
+                    input message: "Are you sure you want to destroy the infrastructure?"
+                    bat """
+                        terraform init -input=false
+                        terraform destroy -auto-approve --var-file=terraform.tfvars ^
+                            -var AWS_ACCESS_KEY_ID=%AWS_ACCESS_KEY_ID% ^
+                            -var AWS_SECRET_ACCESS_KEY=%AWS_SECRET_ACCESS_KEY%
+                    """
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            archiveArtifacts artifacts: 'terraform/code/tfplan.txt'
+        }
+    }
+}
