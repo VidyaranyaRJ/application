@@ -13,6 +13,6 @@ resource "aws_instance" "ecs_instance" {
   key_name                    = "vj-test"
 
   tags = {
-    Name = "ecs-instance-ubuntu"
+    Name = var.ec2_name
   }
 }

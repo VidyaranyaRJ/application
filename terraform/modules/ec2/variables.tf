@@ -13,3 +13,8 @@ variable "sg_id" {
   description = "Security group ID"
 }
 
+
+variable "ec2_name" {
+  type = string
+  description = "Ec2 name"
+}

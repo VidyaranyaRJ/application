@@ -20,9 +20,9 @@ variable "AWS_SECRET_ACCESS_KEY" {
 
 
 
-variable "sg_name" {
-  type        = string
-}
+# variable "sg_name" {
+#   type        = string
+# }
 
 variable "environment" {
   description = "Environment to deploy to (qa or prod)"
