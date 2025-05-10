@@ -18,3 +18,10 @@ variable "ec2_name" {
   type = string
   description = "Ec2 name"
 }
+
+
+###########
+variable "elb_ec2_name" {
+  type = string
+  description = "elb attach"
+}

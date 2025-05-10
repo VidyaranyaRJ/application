@@ -23,6 +23,9 @@ module "ec2" {
   subnet                                 = module.network.subnet_id
   sg_id                                  = module.network.security_group_id
   ec2_name = local.ec2_name
+  elb_ec2_name = module.elb.aws_elb_elb_test_name
+
+
 }
 
 
@@ -31,3 +34,9 @@ module "network" {
   sg_name = local.sg_name
 }
 
+
+module "elb" {
+  source                                 = "../modules/elb"
+  elb_name = "elb-node"
+  # instance_id = moduke.ec2.ec2_id
+}
