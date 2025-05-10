@@ -9,8 +9,7 @@ terraform {
     # bucket         = "vj-test-ecr-79"  
     # key            = "terraform.tfstate"  
     # region         = "us-east-2" 
-    # encrypt        = true
-    
+    # encrypt        = true 
   }
 }
 
