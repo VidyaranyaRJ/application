@@ -1,86 +1,77 @@
-# name: Terraform Deployment
+name: Terraform Deployment
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
 
-# on:
-#   push:
-#     branches: [ main ]
-#   pull_request:
-#     branches: [ main ]
-#   workflow_dispatch:
-#     inputs:
-#       environment:
-#         description: "Which environment to deploy to?"
-#         required: true
-#         type: choice
-#         default: "qa"
-#         options:
-#           - qa
-#           - prod
 
-# jobs:
-#   terraform:
-#     runs-on: ubuntu-latest
-#     environment: AWS
-#     defaults:
-#       run:
-#         working-directory: ./terraform/code/
-#     steps:
-#     - name: Checkout repository
-#       uses: actions/checkout@v3
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    environment: AWS
+    defaults:
+      run:
+        working-directory: ./terraform/code/
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
       
-#     - name: Setup Terraform
-#       uses: hashicorp/setup-terraform@v2
-#       with:
-#         terraform_version: 1.5.0
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v2
+      with:
+        terraform_version: 1.5.0
         
-#     - name: Configure AWS credentials
-#       uses: aws-actions/configure-aws-credentials@v2
-#       with:
-#         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-#         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-#         aws-region: us-east-2
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-2
     
-#     - name: Verify AWS CLI
-#       run: aws sts get-caller-identity
+    - name: Verify AWS CLI
+      run: aws sts get-caller-identity
         
-#     - name: Terraform Init with S3 Backend
-#       run: |
-#         ENV="${{ github.event.inputs.environment }}"
-#         if [ -z "$ENV" ]; then
-#           echo "❌ Environment input is missing."
-#           exit 1
-#         fi
+    - name: Terraform Init with S3 Backend
+      run: |
+        ENV="qa"
+        if [ -z "$ENV" ]; then
+          echo "❌ Environment input is missing."
+          exit 1
+        fi
     
-#         echo "⚙️  Initializing backend for environment: $ENV"
+        echo "⚙️  Initializing backend for environment: $ENV"
     
-#         terraform init \
-#           -backend-config="bucket=vj-test-ecr-79" \
-#           -backend-config="key=${ENV}/terraform.tfstate" \
-#           -backend-config="region=us-east-2" \
-#           -backend-config="encrypt=true"
+        terraform init \
+          -backend-config="bucket=vj-test-ecr-79" \
+          -backend-config="key=${ENV}/terraform.tfstate" \
+          -backend-config="region=us-east-2" \
+          -backend-config="encrypt=true"
 
-#     - name: Terraform Format
-#       run: terraform fmt -check
-#       continue-on-error: true
+    - name: Terraform Format
+      run: terraform fmt -check
+      continue-on-error: true
 
-#     - name: Terraform Validate
-#       run: terraform validate
+    - name: Terraform Validate
+      run: terraform validate
 
-#     - name: Terraform Plan
-#       run: |
-#         export TF_VAR_AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}"
-#         export TF_VAR_AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}"
-#         export TF_VAR_environment="${{ github.event.inputs.environment }}"
-#         terraform plan -input=false -no-color -out=tfplan
-#       timeout-minutes: 5
+    - name: Terraform Plan
+      run: |
+        export TF_VAR_AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}"
+        export TF_VAR_AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+        export TF_VAR_environment="${{ github.event.inputs.environment }}"
+        terraform plan -input=false -no-color -out=tfplan
+      timeout-minutes: 5
           
-#     - name: Terraform Apply
-#       if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
-#       run: |
-#         export TF_VAR_AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}"
-#         export TF_VAR_AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}"
-#         export TF_VAR_environment="${{ github.event.inputs.environment }}"
-#         terraform apply -auto-approve tfplan
-#       timeout-minutes: 10
+    - name: Terraform Apply
+      if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+      run: |
+        export TF_VAR_AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}"
+        export TF_VAR_AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+        export TF_VAR_environment="${{ github.event.inputs.environment }}"
+        terraform apply -auto-approve tfplan
+      timeout-minutes: 10
 
 
 
@@ -95,59 +86,64 @@
 #     #   timeout-minutes: 12
     
 
-name: Terraform Deployment
 
-on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: "Which environment to deploy to?"
-        required: true
-        type: choice
-        default: "prod"
-        options:
-          - qa
-          - prod
 
-jobs:
-  terraform:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./terraform/code/
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
-        with:
-          terraform_version: 1.5.0
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-2
 
-      - name: Terraform Init
-        run: |
-          ENV="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || 'qa' }}"
-          echo "⚙️ Initializing backend for: $ENV"
-          terraform init \
-            -backend-config="bucket=vj-test-ecr-79" \
-            -backend-config="key=${ENV}/terraform.tfstate" \
-            -backend-config="region=us-east-2" \
-            -backend-config="encrypt=true"
 
-      - name: Terraform Plan
-        run: |
-          ENV="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || 'qa' }}"
-          terraform plan -var="environment=$ENV" -out=tfplan
+# name: Terraform Deployment
 
-      - name: Terraform Apply
-        run: terraform apply -auto-approve tfplan
-        
+# on:
+#   push:
+#     branches: [ main ]
+#   workflow_dispatch:
+#     inputs:
+#       environment:
+#         description: "Which environment to deploy to?"
+#         required: true
+#         type: choice
+#         default: "prod"
+#         options:
+#           - qa
+#           - prod
+
+# jobs:
+#   terraform:
+#     runs-on: ubuntu-latest
+#     defaults:
+#       run:
+#         working-directory: ./terraform/code/
+#     steps:
+#       - name: Checkout
+#         uses: actions/checkout@v3
+
+#       - name: Setup Terraform
+#         uses: hashicorp/setup-terraform@v2
+#         with:
+#           terraform_version: 1.5.0
+
+#       - name: Configure AWS credentials
+#         uses: aws-actions/configure-aws-credentials@v2
+#         with:
+#           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#           aws-region: us-east-2
+
+#       - name: Terraform Init
+#         run: |
+#           ENV="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || 'qa' }}"
+#           echo "⚙️ Initializing backend for: $ENV"
+#           terraform init \
+#             -backend-config="bucket=vj-test-ecr-79" \
+#             -backend-config="key=${ENV}/terraform.tfstate" \
+#             -backend-config="region=us-east-2" \
+#             -backend-config="encrypt=true"
+
+#       - name: Terraform Plan
+#         run: |
+#           ENV="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || 'qa' }}"
+#           terraform plan -var="environment=$ENV" -out=tfplan
+
+#       - name: Terraform Apply
+#         run: terraform apply -auto-approve tfplan
