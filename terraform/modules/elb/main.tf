@@ -4,8 +4,8 @@ resource "aws_elb" "elb_test" {
   availability_zones = ["us-east-2a", "us-east-2b", "us-east-2c"]
 
   access_logs {
-    bucket        = "foo"
-    bucket_prefix = "bar"
+    bucket        = "vj-test-ecr-79"
+    bucket_prefix = "elb-logs"
     interval      = 60
   }
 
