@@ -95,7 +95,7 @@ on:
     branches: [ main ]
 
 env:
-  ENVIRONMENT: prod  #####Check prod or qa
+  ENVIRONMENT: qa  #####Check prod or qa
 
 jobs:
   terraform:
