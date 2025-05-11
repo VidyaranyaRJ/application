@@ -21,7 +21,13 @@ variable "ec2_name" {
 
 
 ###########
-variable "elb_ec2_name" {
+# variable "elb_ec2_name" {
+#   type = string
+#   description = "elb attach"
+# }
+
+
+
+variable "tg" {
   type = string
-  description = "elb attach"
 }

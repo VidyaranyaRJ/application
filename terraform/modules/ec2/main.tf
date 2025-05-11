@@ -100,7 +100,7 @@ resource "aws_autoscaling_group" "ecs_asg" {
     version = "$Latest"
   }
 
-  target_group_arns = [aws_lb_target_group.app_tg.arn]
+  target_group_arns = [var.tg]
 
   tag {
     key                 = "Name"
@@ -108,3 +108,5 @@ resource "aws_autoscaling_group" "ecs_asg" {
     propagate_at_launch = true
   }
 }
+
+

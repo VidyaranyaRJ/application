@@ -23,9 +23,7 @@ module "ec2" {
   subnet                                 = module.network.subnet_id
   sg_id                                  = module.network.security_group_id
   ec2_name = local.ec2_name
-  elb_ec2_name = module.elb.aws_elb_elb_test_name
-
-
+  tg = module.alb.tg_arn
 }
 
 
@@ -35,11 +33,12 @@ module "network" {
 }
 
 
-module "elb" {
+module "alb" {
   source                                 = "../modules/elb"
   alb_name = var.alb_name
   sg_id = module.network.security_group_id
   subnet_ids= [module.network.subnet_id]
   vpc_id = module.network.vpc_id
+
 }
 

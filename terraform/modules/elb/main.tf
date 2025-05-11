@@ -11,7 +11,7 @@ resource "aws_lb" "app_alb" {
 
 # Target Group
 resource "aws_lb_target_group" "app_tg" {
-  name        = "$(var.alb_name)_tg"
+  name        = "${var.alb_name}-tg"
   port        = 8000
   protocol    = "HTTP"
   target_type = "instance"
