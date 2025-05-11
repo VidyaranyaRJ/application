@@ -145,7 +145,7 @@ jobs:
       #   run: terraform apply -auto-approve tfplan
       
       - name: Terraform Destroy
-        run: terraform destroy -auto-approve tfplan
+        run: terraform destroy -auto-approve 
 
       - name: Pull and Restart Node.js via SSM
         run: |
