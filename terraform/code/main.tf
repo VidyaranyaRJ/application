@@ -1,23 +1,49 @@
-terraform {
-  backend "s3" {
-    bucket         = "vj-test-ecr-79"  
-    key            = "terraform.tfstate"  
-    region         = "us-east-2" 
-    encrypt        = true
-  }
+provider "aws" {
+  region     = var.region
+
 }
 
 
+terraform {
+  backend "s3" {
+    # bucket         = "vj-test-ecr-79"  
+    # key            = "terraform.tfstate"  
+    # region         = "us-east-2" 
+    # encrypt        = true 
+  }
+}
+
+locals {
+  sg_name = "sg_name_${var.environment}"
+  ec2_name = "ec2-vj_${var.environment}"
+}
+
 module "ec2" {
   source                                 = "../modules/ec2"
-  subnet                                 = module.network.subnet_id
+  subnet                                 = module.network.subnet_id_a
   sg_id                                  = module.network.security_group_id
-
+  ec2_name = local.ec2_name
+  
+  #production
+  tg = module.alb.tg_arn
 }
 
 
 module "network" {
   source                                 = "../modules/network"
-  sg_name = var.sg_name
+  sg_name = local.sg_name
+}
+
+
+
+#production####
+
+module "alb" {
+  source                                 = "../modules/elb"
+  alb_name = var.alb_name
+  sg_id = module.network.security_group_id
+  subnet_ids= [module.network.subnet_id_a, module.network.subnet_id_b ]
+  vpc_id = module.network.vpc_id
+
 }
 
