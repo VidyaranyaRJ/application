@@ -141,8 +141,11 @@ jobs:
       - name: Terraform Plan
         run: terraform plan -input=false -var="environment=${ENVIRONMENT}" -out=tfplan
 
-      - name: Terraform Apply
-        run: terraform apply -auto-approve tfplan
+      # - name: Terraform Apply
+      #   run: terraform apply -auto-approve tfplan
+      
+      - name: Terraform Destroy
+        run: terraform destroy -auto-approve tfplan
 
       - name: Pull and Restart Node.js via SSM
         run: |
