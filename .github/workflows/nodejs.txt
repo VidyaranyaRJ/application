@@ -9,7 +9,7 @@ on:
       force_rebuild:
         description: 'Force complete rebuild'
         required: false
-        default: 'false'
+        default: false
         type: boolean
 
 jobs:
@@ -28,27 +28,27 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_KEY }}
           script: |
-            echo "🛑 Stopping and cleaning existing app..."
+            echo "Stopping and cleaning existing app..."
             pm2 stop all || true
             pm2 delete all || true
             sudo systemctl stop nginx || true
             rm -rf ~/myapp || true
 
-            echo "📦 Updating system packages..."
+            echo "Updating system packages..."
             sudo apt update -y
             sudo apt install -y git curl nginx
 
-            echo "🔧 Installing Node.js and PM2..."
+            echo "Installing Node.js and PM2..."
             curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
             sudo apt install -y nodejs
             sudo npm install -g pm2
 
-            echo "📥 Cloning repo and installing dependencies..."
+            echo "Cloning repo and installing dependencies..."
             git clone -b main https://github.com/VidyaranyaRJ/application.git ~/myapp
             cd ~/myapp/nodejs
             npm install
 
-            echo "🚀 Starting app with PM2 and configuring startup..."
+            echo "Starting app with PM2 and configuring startup..."
             pm2 start index.js --name "node-app"
             pm2 save
 
@@ -58,7 +58,7 @@ jobs:
             sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u $USER --hp $HOME
             pm2 save
 
-            echo "🌐 Setting up NGINX reverse proxy..."
+            echo "Setting up NGINX reverse proxy..."
             sudo tee /etc/nginx/sites-available/default > /dev/null <<EOL
             server {
               listen 80;
@@ -73,7 +73,7 @@ jobs:
             }
             EOL
 
-            echo "🔄 Restarting NGINX..."
+            echo "Restarting NGINX..."
             sudo systemctl restart nginx
 
-            echo "✅ Deployment completed and app will restart automatically on reboot."
+            echo "Deployment completed and app will restart automatically on reboot."
