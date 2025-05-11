@@ -18,6 +18,43 @@ resource "aws_instance" "ecs_instance" {
   tags = {
     Name = var.ec2_name
   }
+  user_data = base64encode(<<-EOF
+    #!/bin/bash
+    sudo apt update -y
+    sudo apt install -y git curl nginx amazon-ssm-agent
+
+    systemctl enable amazon-ssm-agent
+    systemctl start amazon-ssm-agent
+
+    curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+    sudo apt install -y nodejs
+    sudo npm install -g pm2
+
+    cd /home/ubuntu
+    git clone -b main https://github.com/VidyaranyaRJ/application.git myapp || true
+    cd myapp/nodejs
+    npm install
+    pm2 start index.js --name node-app
+    pm2 startup systemd
+    pm2 save
+
+    sudo bash -c 'cat > /etc/nginx/sites-available/default' <<NGINX
+    server {
+      listen 80;
+      location / {
+        proxy_pass http://localhost:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_cache_bypass \$http_upgrade;
+      }
+    }
+    NGINX
+
+    sudo systemctl restart nginx
+  EOF
+  )
 }
 
 
