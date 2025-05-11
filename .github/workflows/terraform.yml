@@ -141,12 +141,13 @@ jobs:
       - name: Terraform Plan
         run: terraform plan -input=false -var="environment=${ENVIRONMENT}" -out=tfplan
 
-      # - name: Terraform Apply
-      #   run: terraform apply -auto-approve tfplan
-      
-      - name: Terraform Destroy
-        run: terraform destroy -auto-approve 
+      # - name: Terraform Destroy
+      #   run: terraform destroy -auto-approve 
 
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve tfplan
+      
       - name: Pull and Restart Node.js via SSM
         run: |
           echo "Fetching instance ID with tag 'Role=NodeAutoScale'..."
