@@ -25,7 +25,7 @@ module "ec2" {
   ec2_name = local.ec2_name
   
   #production
-  #tg = module.alb.tg_arn
+  tg = module.alb.tg_arn
 }
 
 
@@ -38,12 +38,12 @@ module "network" {
 
 #production####
 
-# module "alb" {
-#   source                                 = "../modules/elb"
-#   alb_name = var.alb_name
-#   sg_id = module.network.security_group_id
-#   subnet_ids= [module.network.subnet_id_a, module.network.subnet_id_b ]
-#   vpc_id = module.network.vpc_id
+module "alb" {
+  source                                 = "../modules/elb"
+  alb_name = var.alb_name
+  sg_id = module.network.security_group_id
+  subnet_ids= [module.network.subnet_id_a, module.network.subnet_id_b ]
+  vpc_id = module.network.vpc_id
 
-# }
+}
 

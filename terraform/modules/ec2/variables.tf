@@ -28,6 +28,6 @@ variable "ec2_name" {
 
 
 #production###
-# variable "tg" {
-#   type = string
-# }
+variable "tg" {
+  type = string
+}
