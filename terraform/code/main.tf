@@ -23,7 +23,9 @@ module "ec2" {
   subnet                                 = module.network.subnet_id_a
   sg_id                                  = module.network.security_group_id
   ec2_name = local.ec2_name
-  tg = module.alb.tg_arn
+  
+  #production
+  #tg = module.alb.tg_arn
 }
 
 
