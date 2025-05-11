@@ -25,7 +25,7 @@ data "aws_iam_instance_profile" "ecs_profile" {
 ####################Auto scaling purpose###############
 
 
-
+# Launch Template
 resource "aws_launch_template" "ecs_launch_template" {
   name_prefix   = "ecs-lt-${var.ec2_name}"
   image_id      = "ami-0c3b809fcf2445b6a"
@@ -41,33 +41,23 @@ resource "aws_launch_template" "ecs_launch_template" {
     security_groups             = [var.sg_id]
   }
 
-  user_data = base64encode(<<EOF
+  user_data = base64encode(<<-EOF
     #!/bin/bash
-    # Install system updates and tools
     sudo apt update -y
     sudo apt install -y git curl nginx
 
-    # Install Node.js 18 and PM2
     curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
     sudo apt install -y nodejs
     sudo npm install -g pm2
 
-    # Clone your app repo and install dependencies
     cd /home/ubuntu
     git clone -b main https://github.com/VidyaranyaRJ/application.git myapp
     cd myapp/nodejs
     npm install
-
-    # Start the app with PM2
-    pm2 start index.js --name "node-app"
+    pm2 start index.js --name node-app
+    pm2 startup systemd
     pm2 save
 
-    # Make PM2 survive reboots
-    pm2 startup systemd -u ubuntu --hp /home/ubuntu
-    sudo env PATH=$PATH:/usr/bin pm2 startup systemd -u ubuntu --hp /home/ubuntu
-    pm2 save
-
-    # Configure NGINX as reverse proxy (optional if using port 8000 directly)
     sudo tee /etc/nginx/sites-available/default > /dev/null <<NGINX
     server {
       listen 80;
@@ -82,11 +72,9 @@ resource "aws_launch_template" "ecs_launch_template" {
     }
     NGINX
 
-    # Restart NGINX
     sudo systemctl restart nginx
-    EOF
+  EOF
   )
-
 
   tag_specifications {
     resource_type = "instance"
@@ -96,25 +84,23 @@ resource "aws_launch_template" "ecs_launch_template" {
   }
 }
 
-
-
-
-
+# Auto Scaling Group
 resource "aws_autoscaling_group" "ecs_asg" {
-  name_prefix          = "ecs-asg-${var.ec2_name}"
-  max_size             = 2
-  min_size             = 1
-  desired_capacity     = 1
-  vpc_zone_identifier  = [var.subnet]
-  health_check_type    = "EC2"
-  force_delete         = true
+  name_prefix               = "ecs-asg-${var.ec2_name}"
+  max_size                  = 2
+  min_size                  = 1
+  desired_capacity          = 1
+  vpc_zone_identifier       = [var.subnet]
+  health_check_type         = "ELB"
+  health_check_grace_period = 300
+  force_delete              = true
 
   launch_template {
     id      = aws_launch_template.ecs_launch_template.id
     version = "$Latest"
   }
 
-  load_balancers = [var.elb_ec2_name]
+  target_group_arns = [aws_lb_target_group.app_tg.arn]
 
   tag {
     key                 = "Name"

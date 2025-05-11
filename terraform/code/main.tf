@@ -37,7 +37,9 @@ module "network" {
 
 module "elb" {
   source                                 = "../modules/elb"
-  elb_name = var.elb_name
-  # instance_id = moduke.ec2.ec2_id
+  alb_name = var.alb_name
+  sg_id = module.network.security_group_id
+  subnet_ids= [module.network.subnet_id]
+  vpc_id = module.network.vpc_id
 }
 

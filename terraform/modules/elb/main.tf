@@ -1,38 +1,41 @@
-# Create a new load balancer
-resource "aws_elb" "elb_test" {
-  name               = var.elb_name
-  availability_zones = ["us-east-2a", "us-east-2b", "us-east-2c"]
-
-  access_logs {
-    bucket        = "vj-test-ecr-79"
-    bucket_prefix = "elb-logs"
-    interval      = 60
-  }
-
-  listener {
-    instance_port     = 8000
-    instance_protocol = "http"
-    lb_port           = 80
-    lb_protocol       = "http"
-  }
+# ALB Resource
+resource "aws_lb" "app_alb" {
+  name               = var.alb_name
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [var.sg_id]
+  subnets            = var.subnet_ids
+}
 
 
+
+# Target Group
+resource "aws_lb_target_group" "app_tg" {
+  name        = "$(var.alb_name)_tg"
+  port        = 8000
+  protocol    = "HTTP"
+  target_type = "instance"
+  vpc_id      = var.vpc_id
 
   health_check {
-    healthy_threshold   = 2
-    unhealthy_threshold = 2
-    timeout             = 3
-    target              = "HTTP:8000/"
+    path                = "/"
+    protocol            = "HTTP"
+    matcher             = "200"
     interval            = 30
+    timeout             = 5
+    healthy_threshold   = 3
+    unhealthy_threshold = 3
   }
+}
 
-  # instances                   = [var.instance_id]
-  cross_zone_load_balancing   = true
-  idle_timeout                = 400
-  connection_draining         = true
-  connection_draining_timeout = 400
+# Listener
+resource "aws_lb_listener" "app_listener" {
+  load_balancer_arn = aws_lb.app_alb.arn
+  port              = 80
+  protocol          = "HTTP"
 
-  tags = {
-    Name = "foobar-terraform-elb"
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.app_tg.arn
   }
 }
