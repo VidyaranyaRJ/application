@@ -214,8 +214,7 @@ jobs:
         run: |
           echo "Fetching instance IDs for Role=NodeAutoScale..."
           instance_ids=$(aws ec2 describe-instances \
-            --filters "Name=tag:Role,Values=NodeAutoScale" \
-                      "Name=instance-state-name,Values=running" \
+            --filters "Name=tag:Role,Values=NodeAutoScale" "Name=instance-state-name,Values=running" \
             --query "Reservations[].Instances[].InstanceId" \
             --output text)
 
@@ -224,13 +223,12 @@ jobs:
             exit 1
           fi
 
-          echo "Waiting for instances to register with SSM..."
+          echo "Waiting for each instance to register with SSM..."
           for id in $instance_ids; do
             for i in {1..10}; do
               status=$(aws ssm describe-instance-information \
                 --query "InstanceInformationList[?InstanceId=='$id'] | [0].PingStatus" \
                 --output text)
-
               if [ "$status" = "Online" ]; then
                 echo "SSM is online for $id"
                 break
@@ -246,7 +244,7 @@ jobs:
             fi
           done
 
-          echo "Sending update command to all instances..."
+          echo "Sending update command to ALL instances..."
           command_id=$(aws ssm send-command \
             --document-name "AWS-RunShellScript" \
             --targets "Key=tag:Role,Values=NodeAutoScale" \
@@ -258,7 +256,7 @@ jobs:
             --query "Command.CommandId" \
             --output text)
 
-          echo "Waiting for command $command_id to complete on each instance..."
+          echo "Waiting for command $command_id to finish on all instances..."
           for id in $instance_ids; do
             aws ssm wait command-executed \
               --command-id "$command_id" \
@@ -266,15 +264,17 @@ jobs:
               --region us-east-2
           done
 
-          echo "Fetching command outputs..."
+          echo "---- Fetching command output ----"
           for id in $instance_ids; do
-            output=$(aws ssm get-command-invocation \
+            echo "--- Output for $id ---"
+            aws ssm get-command-invocation \
               --command-id "$command_id" \
               --instance-id "$id" \
               --region us-east-2 \
               --query "StandardOutputContent" \
-              --output text)
-
-            echo "--- Output from $id ---"
-            echo "$output"
+              --output text
           done
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-2
