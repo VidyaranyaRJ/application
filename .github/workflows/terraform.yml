@@ -5,7 +5,7 @@ on:
     branches: [ main ] 
 
 env:
-  ENVIRONMENT: prod  # <<<  qa or prod
+  ENVIRONMENT: qa  # <<<  qa or prod
 
 jobs:
   terraform:
