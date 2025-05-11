@@ -152,63 +152,63 @@ jobs:
       # - name: Terraform Apply
       #   run: terraform apply -auto-approve tfplan
       
-      - name: Pull and Restart Node.js via SSM
-        run: |
-          echo "Fetching instance ID with tag 'Role=NodeAutoScale'..."
-          instance_id=$(aws ec2 describe-instances \
-            --filters "Name=tag:Role,Values=NodeAutoScale" \
-            --query "Reservations[0].Instances[0].InstanceId" \
-            --output text)
+      # - name: Pull and Restart Node.js via SSM
+      #   run: |
+      #     echo "Fetching instance ID with tag 'Role=NodeAutoScale'..."
+      #     instance_id=$(aws ec2 describe-instances \
+      #       --filters "Name=tag:Role,Values=NodeAutoScale" \
+      #       --query "Reservations[0].Instances[0].InstanceId" \
+      #       --output text)
       
-          echo "Waiting for EC2 instance $instance_id to be in 'running' state..."
-          aws ec2 wait instance-status-ok --instance-ids "$instance_id"
+      #     echo "Waiting for EC2 instance $instance_id to be in 'running' state..."
+      #     aws ec2 wait instance-status-ok --instance-ids "$instance_id"
       
-          echo "Waiting for instance to register with SSM..."
-          for i in {1..10}; do
-            status=$(aws ssm describe-instance-information \
-              --query "InstanceInformationList[?InstanceId=='$instance_id'] | [0].PingStatus" \
-              --output text)
+      #     echo "Waiting for instance to register with SSM..."
+      #     for i in {1..10}; do
+      #       status=$(aws ssm describe-instance-information \
+      #         --query "InstanceInformationList[?InstanceId=='$instance_id'] | [0].PingStatus" \
+      #         --output text)
       
-            if [ "$status" = "Online" ]; then
-              echo "SSM is online for $instance_id"
-              break
-            else
-              echo "SSM not online yet... retrying ($i/10)"
-              sleep 15
-            fi
-          done
+      #       if [ "$status" = "Online" ]; then
+      #         echo "SSM is online for $instance_id"
+      #         break
+      #       else
+      #         echo "SSM not online yet... retrying ($i/10)"
+      #         sleep 15
+      #       fi
+      #     done
       
-          if [ "$status" != "Online" ]; then
-            echo "SSM agent not available. Failing..."
-            exit 1
-          fi
+      #     if [ "$status" != "Online" ]; then
+      #       echo "SSM agent not available. Failing..."
+      #       exit 1
+      #     fi
       
-          echo "Sending update command to instance $instance_id"
-          command_id=$(aws ssm send-command \
-            --document-name "AWS-RunShellScript" \
-            --targets "Key=tag:Role,Values=NodeAutoScale" \
-            --comment "Update Node.js app from GitHub" \
-            --parameters 'commands=[
-              "cd /home/ubuntu/myapp && git fetch --all && git reset --hard origin/main >> /tmp/git.log 2>&1 && pm2 restart node-app >> /tmp/pm2.log 2>&1"
-            ]' \
-            --region us-east-2 \
-            --query "Command.CommandId" \
-            --output text)
+      #     echo "Sending update command to instance $instance_id"
+      #     command_id=$(aws ssm send-command \
+      #       --document-name "AWS-RunShellScript" \
+      #       --targets "Key=tag:Role,Values=NodeAutoScale" \
+      #       --comment "Update Node.js app from GitHub" \
+      #       --parameters 'commands=[
+      #         "cd /home/ubuntu/myapp && git fetch --all && git reset --hard origin/main >> /tmp/git.log 2>&1 && pm2 restart node-app >> /tmp/pm2.log 2>&1"
+      #       ]' \
+      #       --region us-east-2 \
+      #       --query "Command.CommandId" \
+      #       --output text)
       
-          echo "Waiting for command $command_id to complete..."
-          aws ssm wait command-executed \
-            --command-id "$command_id" \
-            --instance-id "$instance_id" \
-            --region us-east-2
+      #     echo "Waiting for command $command_id to complete..."
+      #     aws ssm wait command-executed \
+      #       --command-id "$command_id" \
+      #       --instance-id "$instance_id" \
+      #       --region us-east-2
       
-          echo "Fetching command output..."
-          output=$(aws ssm get-command-invocation \
-            --command-id "$command_id" \
-            --instance-id "$instance_id" \
-            --region us-east-2 \
-            --query "StandardOutputContent" \
-            --output text)
+      #     echo "Fetching command output..."
+      #     output=$(aws ssm get-command-invocation \
+      #       --command-id "$command_id" \
+      #       --instance-id "$instance_id" \
+      #       --region us-east-2 \
+      #       --query "StandardOutputContent" \
+      #       --output text)
       
-          echo "---- SSM Command Output ----"
-          echo "$output"
+      #     echo "---- SSM Command Output ----"
+      #     echo "$output"
       
