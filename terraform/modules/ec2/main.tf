@@ -38,21 +38,28 @@ resource "aws_instance" "ecs_instance" {
     pm2 startup systemd
     pm2 save
 
-    sudo bash -c 'cat > /etc/nginx/sites-available/default' <<NGINX
+    # Configure NGINX as reverse proxy and reload safely
+    sudo bash -c 'cat > /etc/nginx/sites-available/default' <<'NGINX'
     server {
       listen 80;
       location / {
         proxy_pass http://localhost:8000;
         proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
-        proxy_set_header Host \$host;
-        proxy_cache_bypass \$http_upgrade;
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
       }
     }
     NGINX
 
+    echo "Testing NGINX config..."
+    sudo nginx -t
+
+    echo "Reloading NGINX..."
     sudo systemctl restart nginx
+
+    echo "NGINX setup complete" >> /var/log/deploy.log
   EOF
   )
 }
