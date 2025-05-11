@@ -143,18 +143,19 @@ jobs:
 
 
 
-      - name: 🕵️ Verify SSM registration
+      - name: 🚀 Pull latest Node.js code via SSM
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: us-east-2
         run: |
-          echo "Checking if any EC2 instances are registered with SSM..."
-          SSM_COUNT=$(aws ssm describe-instance-information --region us-east-2 --output json | jq '.InstanceInformationList | length')
-          if [ "$SSM_COUNT" -eq 0 ]; then
-            echo "❌ No EC2 instances registered with SSM. Ensure SSM agent is installed and IAM role has AmazonSSMManagedInstanceCore."
-            exit 1
-          else
-            echo "✅ $SSM_COUNT EC2 instance(s) are ready for SSM commands."
-          fi
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --targets "Key=tag:Role,Values=NodeAutoScale" \
+            --comment "Update Node.js app from GitHub" \
+            --parameters 'commands=[
+              "cd /home/ubuntu/myapp && git pull origin main && pm2 restart node-app"
+            ]' \
+            --region us-east-2
+      
     
