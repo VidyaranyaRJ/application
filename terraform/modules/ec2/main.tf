@@ -73,6 +73,12 @@ resource "aws_launch_template" "ecs_launch_template" {
     NGINX
 
     sudo systemctl restart nginx
+    nohup bash -c '
+    while true; do
+      cd /home/ubuntu/myapp && git pull origin main && pm2 restart node-app
+      sleep 5
+    done
+    ' > /home/ubuntu/pull.log 2>&1 &
   EOF
   )
 
