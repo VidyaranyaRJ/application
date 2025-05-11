@@ -55,36 +55,36 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: terraform plan -input=false -var="environment=${ENVIRONMENT}" -out=tfplan
 
-      # - name: Terraform Apply
-      #   env:
-      #     AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      #     AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      #   run: terraform apply -auto-approve tfplan
+      - name: Terraform Apply
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: terraform apply -auto-approve tfplan
       
 
-      #Destroy resources
-      - name: Terraform Destroy
-        run: |
-          echo "DESTROYING ALL RESOURCES!"
-          export TF_VAR_AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}"
-          export TF_VAR_AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}"
-          terraform destroy -auto-approve
-        timeout-minutes: 12
-
-
-      ###production
-      # - name: Pull latest Node.js code via SSM
-      #   env:
-      #     AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      #     AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      #     AWS_DEFAULT_REGION: us-east-2
+      # #Destroy resources
+      # - name: Terraform Destroy
       #   run: |
-      #     aws ssm send-command \
-      #       --document-name "AWS-RunShellScript" \
-      #       --targets "Key=tag:Role,Values=NodeAutoScale" \
-      #       --comment "Update Node.js app from GitHub" \
-      #       --parameters 'commands=[
-      #         "cd /home/ubuntu/myapp && git pull origin main && pm2 restart node-app"
-      #       ]' \
-      #       --region us-east-2
+      #     echo "DESTROYING ALL RESOURCES!"
+      #     export TF_VAR_AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}"
+      #     export TF_VAR_AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+      #     terraform destroy -auto-approve
+      #   timeout-minutes: 12
+
+
+      ##production
+      - name: Pull latest Node.js code via SSM
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-2
+        run: |
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --targets "Key=tag:Role,Values=NodeAutoScale" \
+            --comment "Update Node.js app from GitHub" \
+            --parameters 'commands=[
+              "cd /home/ubuntu/myapp && git pull origin main && pm2 restart node-app"
+            ]' \
+            --region us-east-2
       
