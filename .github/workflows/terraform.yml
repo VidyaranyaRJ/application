@@ -126,17 +126,17 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: terraform plan -input=false -var="environment=${ENVIRONMENT}" -out=tfplan
 
-      # - name: Terraform Apply
-      #   env:
-      #     AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      #     AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      #   run: terraform apply -auto-approve tfplan
+      - name: Terraform Apply
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: terraform apply -auto-approve tfplan
       
-      # #Destroy resources
-      # - name: Terraform Destroy
-      #   run: |
-      #     echo "DESTROYING ALL RESOURCES!"
-      #     export TF_VAR_AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}"
-      #     export TF_VAR_AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}"
-      #     terraform destroy -auto-approve
-      #   timeout-minutes: 12
+      #Destroy resources
+      - name: Terraform Destroy
+        run: |
+          echo "DESTROYING ALL RESOURCES!"
+          export TF_VAR_AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}"
+          export TF_VAR_AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+          terraform destroy -auto-approve
+        timeout-minutes: 12
