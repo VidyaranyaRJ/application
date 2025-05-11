@@ -17,6 +17,7 @@ resource "aws_instance" "ecs_instance" {
 
   tags = {
     Name = var.ec2_name
+    Role = "NodeAutoScale"
   }
   user_data = base64encode(<<-EOF
     #!/bin/bash
