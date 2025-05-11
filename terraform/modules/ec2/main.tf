@@ -44,21 +44,24 @@ resource "aws_launch_template" "ecs_launch_template" {
   user_data = base64encode(<<-EOF
     #!/bin/bash
     sudo apt update -y
-    sudo apt install -y git curl nginx
+    sudo apt install -y git curl nginx amazon-ssm-agent
+
+    systemctl enable amazon-ssm-agent
+    systemctl start amazon-ssm-agent
 
     curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
     sudo apt install -y nodejs
     sudo npm install -g pm2
 
     cd /home/ubuntu
-    git clone -b main https://github.com/VidyaranyaRJ/application.git myapp
+    git clone -b main https://github.com/VidyaranyaRJ/application.git myapp || true
     cd myapp/nodejs
     npm install
     pm2 start index.js --name node-app
     pm2 startup systemd
     pm2 save
 
-    sudo tee /etc/nginx/sites-available/default > /dev/null <<NGINX
+    sudo bash -c 'cat > /etc/nginx/sites-available/default' <<NGINX
     server {
       listen 80;
       location / {
@@ -72,20 +75,15 @@ resource "aws_launch_template" "ecs_launch_template" {
     }
     NGINX
 
-    sudo systemctl restart nginx
-    nohup bash -c '
-    while true; do
-      cd /home/ubuntu/myapp && git pull origin main && pm2 restart node-app
-      sleep 5
-    done
-    ' > /home/ubuntu/pull.log 2>&1 &
-  EOF
+        sudo systemctl restart nginx
+      EOF
   )
 
   tag_specifications {
     resource_type = "instance"
     tags = {
-      Name = var.ec2_name
+      Name        = var.ec2_name
+      Role        = "NodeAutoScale"
     }
   }
 }

@@ -126,17 +126,35 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: terraform plan -input=false -var="environment=${ENVIRONMENT}" -out=tfplan
 
-      # - name: Terraform Apply
-      #   env:
-      #     AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      #     AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      #   run: terraform apply -auto-approve tfplan
+      - name: Terraform Apply
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: terraform apply -auto-approve tfplan
       
-      #Destroy resources
-      - name: Terraform Destroy
+      # #Destroy resources
+      # - name: Terraform Destroy
+      #   run: |
+      #     echo "DESTROYING ALL RESOURCES!"
+      #     export TF_VAR_AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}"
+      #     export TF_VAR_AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+      #     terraform destroy -auto-approve
+      #   timeout-minutes: 12
+
+
+
+      - name: 🕵️ Verify SSM registration
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-2
         run: |
-          echo "DESTROYING ALL RESOURCES!"
-          export TF_VAR_AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}"
-          export TF_VAR_AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}"
-          terraform destroy -auto-approve
-        timeout-minutes: 12
+          echo "Checking if any EC2 instances are registered with SSM..."
+          SSM_COUNT=$(aws ssm describe-instance-information --region us-east-2 --output json | jq '.InstanceInformationList | length')
+          if [ "$SSM_COUNT" -eq 0 ]; then
+            echo "❌ No EC2 instances registered with SSM. Ensure SSM agent is installed and IAM role has AmazonSSMManagedInstanceCore."
+            exit 1
+          else
+            echo "✅ $SSM_COUNT EC2 instance(s) are ready for SSM commands."
+          fi
+    
