@@ -1,16 +1,21 @@
 # Ignore everything by default
-*
+.github/workflows/terraform.txt
+.github/workflows/terraform.txt1
 
-# But keep these directories and files
-!.gitignore
-!.github/
-!nodejs/
-!nodejs/index.js
-!nodejs/package.json
+Include/
+Lib/
+Scripts/
+terraform/
 
-# Ignore everything inside nodejs/ by default
-nodejs/*
-# Except the files we want
-!nodejs/index.js
-!nodejs/package.json
-!.github/
+# # But keep these directories and files
+# !.gitignore
+# !.github/workflows/s3_nodejs.yml
+# !nodejs/
+# !nodejs/index.js
+# !nodejs/package.json
+
+
+# # Except the files we want
+# !nodejs/index.js
+# !nodejs/package.json
+# !.github/

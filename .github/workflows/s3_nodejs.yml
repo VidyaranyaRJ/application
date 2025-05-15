@@ -1,0 +1,92 @@
+name: Deploy Node.js App to EFS via S3
+
+on:
+  push:
+    branches: [ nodejs ]
+
+env:
+  AWS_REGION: us-east-2
+  S3_BUCKET: vj-test-benvolate
+  ZIP_NAME: nodejs-app.zip
+  ZIP_S3_KEY: artifacts/nodejs-app.zip
+  EFS_PATH: /mnt/efs/code
+
+jobs:
+  deploy-nodejs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Node.js App Repo
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Zip Node.js App
+        run: |
+          zip -r ${{ env.ZIP_NAME }} . -x "*.git*" -x "*.github*" -x "node_modules/*"
+
+      - name: Upload ZIP to S3
+        run: |
+          aws s3 cp ${{ env.ZIP_NAME }} s3://${{ env.S3_BUCKET }}/${{ env.ZIP_S3_KEY }}
+
+      - name: Read EC2 Instance ID from Terraform state in S3
+        run: |
+          aws s3 cp s3://${{ env.S3_BUCKET }}/EC2/terraform.tfstate tfstate.json
+          INSTANCE_ID=$(jq -r '.outputs.module_instance_id_for_ssm.value' tfstate.json)
+          echo "INSTANCE_ID=$INSTANCE_ID" >> $GITHUB_ENV
+          echo "Resolved EC2 Instance ID: $INSTANCE_ID"
+
+      - name: Deploy and restart app via SSM
+        run: |
+          CMD_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=[
+              "cd ${{ env.EFS_PATH }}",
+              "aws s3 cp s3://${{ env.S3_BUCKET }}/${{ env.ZIP_S3_KEY }} nodejs-app.zip",
+              "rm -rf nodejs-app-temp",
+              "unzip -o nodejs-app.zip -d nodejs-app-temp",
+              "cd nodejs-app-temp && npm install",
+              "pkill -f index.js || echo NoProcessFound",
+              "rm -rf nodejs-app-old || true",
+              "mv nodejs-app nodejs-app-old || true",
+              "mv nodejs-app-temp nodejs-app",
+              "cd nodejs-app",
+              "nohup node index.js > /mnt/efs/logs/app.log 2>&1 & echo $! > app.pid"
+            ]' \
+            --comment "Deploy Node.js update from S3 and restart app" \
+            --region ${{ env.AWS_REGION }} \
+            --query "Command.CommandId" \
+            --output text)
+
+          echo "Sent deployment SSM command: $CMD_ID"
+
+          for i in {1..12}; do
+            STATUS=$(aws ssm get-command-invocation \
+              --command-id "$CMD_ID" \
+              --instance-id "$INSTANCE_ID" \
+              --region ${{ env.AWS_REGION }} \
+              --query "Status" \
+              --output text)
+
+            echo "Command status: $STATUS"
+
+            if [[ "$STATUS" == "Success" ]]; then
+              echo "Deployment completed successfully."
+              aws ssm get-command-invocation \
+                --command-id "$CMD_ID" \
+                --instance-id "$INSTANCE_ID" \
+                --region ${{ env.AWS_REGION }} \
+                --output text
+              break
+            elif [[ "$STATUS" == "Failed" ]]; then
+              echo "Deployment failed"
+              exit 1
+            fi
+            sleep 5
+          done
