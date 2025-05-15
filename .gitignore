@@ -1,0 +1,15 @@
+# Ignore everything by default
+*
+
+# But keep these directories and files
+!.gitignore
+!.github/
+!nodejs/
+!nodejs/index.js
+!nodejs/package.json
+
+# Ignore everything inside nodejs/ by default
+nodejs/*
+# Except the files we want
+!nodejs/index.js
+!nodejs/package.json
