@@ -1,0 +1,62 @@
+name: deploy-nodejs-app
+
+on:
+  push:
+    branches:
+      - nodejs
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout nodejs branch
+        uses: actions/checkout@v3
+        with:
+          ref: nodejs
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: |
+          cd nodejs
+          npm install
+
+      - name: Zip application
+        run: |
+          cd nodejs
+          zip -r app.zip ./
+
+      - name: Upload ZIP to S3
+        run: |
+          aws s3 cp nodejs/app.zip s3://vj-application/app.zip
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: us-east-2
+
+      - name: Trigger EC2 deployment via SSM
+        run: |
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --targets "Key=tag:Name,Values=Instance_1,Instance_2,Instance_3" \
+            --comment "Deploy ZIP to EFS and restart Node.js app" \
+            --parameters '{
+              "commands": [
+                "aws s3 cp s3://vj-application/app.zip /tmp/app.zip",
+                "rm -rf /mnt/efs/code/nodejs && mkdir -p /mnt/efs/code/nodejs",
+                "unzip /tmp/app.zip -d /mnt/efs/code/nodejs",
+                "chown -R ec2-user:ec2-user /mnt/efs/code",
+                "cd /mnt/efs/code/nodejs",
+                "sudo -u ec2-user npm install",
+                "sudo -u ec2-user pm2 restart node-app || sudo -u ec2-user pm2 start index.js --name node-app",
+                "sudo -u ec2-user pm2 save"
+              ]
+            }' \
+            --region us-east-2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: us-east-2
