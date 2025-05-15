@@ -13,3 +13,4 @@ nodejs/*
 # Except the files we want
 !nodejs/index.js
 !nodejs/package.json
+!.github/
