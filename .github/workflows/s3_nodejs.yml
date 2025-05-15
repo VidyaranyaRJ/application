@@ -6,7 +6,7 @@ on:
 
 env:
   AWS_REGION: us-east-2
-  S3_BUCKET: vj-application
+  S3_BUCKET: vj-test-benvolate
   ZIP_NAME: nodejs-app.zip
   ZIP_S3_KEY: artifacts/nodejs-app.zip
   EFS_PATH: /mnt/efs/code
