@@ -40,6 +40,28 @@ jobs:
           INSTANCE_ID=$(jq -r '.outputs.module_instance_id_for_ssm.value' tfstate.json)
           echo "INSTANCE_ID=$INSTANCE_ID" >> $GITHUB_ENV
           echo "Resolved EC2 Instance ID: $INSTANCE_ID"
+      
+
+      - name: Wait for EC2 and SSM to be ready
+        run: |
+          for i in {1..10}; do
+            STATUS=$(aws ec2 describe-instance-status \
+              --instance-ids "$INSTANCE_ID" \
+              --region ${{ env.AWS_REGION }} \
+              --query "InstanceStatuses[0].InstanceState.Name" \
+              --output text)
+
+            echo "Instance state: $STATUS"
+
+            if [[ "$STATUS" == "running" ]]; then
+              echo "Instance is running"
+              break
+            fi
+
+            echo "Waiting for EC2 to be ready..."
+            sleep 10
+          done
+
 
       - name: Deploy and restart app via SSM
         run: |
