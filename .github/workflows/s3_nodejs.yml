@@ -41,7 +41,7 @@ jobs:
         run: |
           aws ssm send-command \
             --document-name "AWS-RunShellScript" \
-            --targets "Key=tag:Name,Values=Instance_1,Instance_2,Instance_3" \
+            --targets "Key=tag:Name,Values=Instance_1 " \
             --comment "Deploy ZIP to EFS and restart Node.js app" \
             --parameters '{
               "commands": [
@@ -62,4 +62,3 @@ jobs:
           AWS_REGION: us-east-2
 
 
-          
