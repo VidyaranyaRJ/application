@@ -46,34 +46,81 @@ jobs:
 
       - name: Deploy and restart app via SSM (Zero Downtime)
         run: |
-          # Create a JSON file for the SSM command parameters to avoid string escaping issues
-          cat > ssm-commands.json << EOF
-          {
-            "commands": [
-              "TIMESTAMP=\$(date +%Y%m%d%H%M%S)",
-              "mkdir -p ${{ env.EFS_PATH }}/backups",
-              "if [ -d \"${{ env.EFS_PATH }}/nodejs-app\" ]; then cp -r ${{ env.EFS_PATH }}/nodejs-app ${{ env.EFS_PATH }}/backups/nodejs-app-\$TIMESTAMP; fi",
-              "aws s3 cp s3://${{ env.S3_BUCKET }}/${{ env.ZIP_S3_KEY }} /tmp/${{ env.ZIP_NAME }}",
-              "unzip -o /tmp/${{ env.ZIP_NAME }} -d ${{ env.EFS_PATH }}/nodejs-app-temp",
-              "cd ${{ env.EFS_PATH }}/nodejs-app-temp",
-              "npm install",
-              "nohup node index.js > ${{ env.EFS_PATH }}/logs/app-temp.log 2>&1 & echo \\$! > app-temp.pid",
-              "sleep 5",
-              "if ps -p \$(cat app-temp.pid) > /dev/null; then echo 'New app started'; else echo 'New app failed'; exit 1; fi",
-              "cp -r ${{ env.EFS_PATH }}/nodejs-app-temp/* ${{ env.EFS_PATH }}/nodejs-app/",
-              "kill \$(cat ${{ env.EFS_PATH }}/nodejs-app/app.pid) || echo 'No existing app to stop'",
-              "mv ${{ env.EFS_PATH }}/nodejs-app-temp/app-temp.pid ${{ env.EFS_PATH }}/nodejs-app/app.pid",
-              "sudo nginx -t && sudo systemctl reload nginx",
-              "tail -n 20 ${{ env.EFS_PATH }}/logs/app-temp.log"
-            ]
-          }
-          EOF
-
-          # Send command using the JSON file
+          # Create a deployment script that will run on the EC2 instance
+          cat > deploy.sh << 'EOL'
+          #!/bin/bash
+          TIMESTAMP=$(date +%Y%m%d%H%M%S)
+          EFS_PATH="{{ EFS_PATH }}"
+          S3_BUCKET="{{ S3_BUCKET }}"
+          ZIP_S3_KEY="{{ ZIP_S3_KEY }}"
+          ZIP_NAME="{{ ZIP_NAME }}"
+          
+          # Create backup
+          mkdir -p $EFS_PATH/backups
+          if [ -d "$EFS_PATH/nodejs-app" ]; then 
+            cp -r $EFS_PATH/nodejs-app $EFS_PATH/backups/nodejs-app-$TIMESTAMP
+          fi
+          
+          # Download and extract the application
+          mkdir -p $EFS_PATH/logs
+          aws s3 cp s3://$S3_BUCKET/$ZIP_S3_KEY /tmp/$ZIP_NAME
+          mkdir -p $EFS_PATH/nodejs-app-temp
+          unzip -o /tmp/$ZIP_NAME -d $EFS_PATH/nodejs-app-temp
+          
+          # Install dependencies
+          cd $EFS_PATH/nodejs-app-temp
+          npm install
+          
+          # Start new app instance
+          nohup node index.js > $EFS_PATH/logs/app-temp.log 2>&1 & 
+          echo $! > app-temp.pid
+          sleep 5
+          
+          # Check if new app started correctly
+          if ps -p $(cat app-temp.pid) > /dev/null; then
+            echo "New app started successfully"
+          else
+            echo "New app failed to start"
+            cat $EFS_PATH/logs/app-temp.log
+            exit 1
+          fi
+          
+          # Update the live app
+          mkdir -p $EFS_PATH/nodejs-app
+          cp -r $EFS_PATH/nodejs-app-temp/* $EFS_PATH/nodejs-app/
+          
+          # Stop old app if running
+          if [ -f "$EFS_PATH/nodejs-app/app.pid" ]; then
+            kill $(cat $EFS_PATH/nodejs-app/app.pid) || echo "No existing app to stop"
+          fi
+          
+          # Update pid file
+          mv $EFS_PATH/nodejs-app-temp/app-temp.pid $EFS_PATH/nodejs-app/app.pid
+          
+          # Reload nginx
+          sudo nginx -t && sudo systemctl reload nginx
+          
+          # Show logs
+          echo "Recent application logs:"
+          tail -n 20 $EFS_PATH/logs/app-temp.log
+          EOL
+          
+          # Replace template variables
+          sed -i "s|{{ EFS_PATH }}|${{ env.EFS_PATH }}|g" deploy.sh
+          sed -i "s|{{ S3_BUCKET }}|${{ env.S3_BUCKET }}|g" deploy.sh
+          sed -i "s|{{ ZIP_S3_KEY }}|${{ env.ZIP_S3_KEY }}|g" deploy.sh
+          sed -i "s|{{ ZIP_NAME }}|${{ env.ZIP_NAME }}|g" deploy.sh
+          
+          # Upload script to S3
+          aws s3 cp deploy.sh s3://${{ env.S3_BUCKET }}/scripts/deploy-nodejs.sh
+          
+          # Run deployment via SSM
           CMD_ID=$(aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
-            --parameters file://ssm-commands.json \
+            --parameters commands=["aws s3 cp s3://${{ env.S3_BUCKET }}/scripts/deploy-nodejs.sh /tmp/deploy-nodejs.sh",
+                                  "chmod +x /tmp/deploy-nodejs.sh",
+                                  "/tmp/deploy-nodejs.sh"] \
             --comment "Zero downtime Node.js app deploy and Nginx reload" \
             --region ${{ env.AWS_REGION }} \
             --query "Command.CommandId" \
@@ -93,11 +140,22 @@ jobs:
             echo "Command status: $STATUS"
             if [ "$STATUS" = "Success" ]; then
               echo "✅ Deployment successful."
+              
+              # Output command result
+              echo "=== Command output ==="
+              aws ssm get-command-invocation \
+                --command-id "$CMD_ID" \
+                --instance-id "$INSTANCE_ID" \
+                --region ${{ env.AWS_REGION }} \
+                --query "StandardOutputContent" \
+                --output text
               break
+              
             elif [ "$STATUS" = "Failed" ] || [ "$STATUS" = "Cancelled" ]; then
               echo "❌ Deployment failed."
               
               # Output command result for debugging
+              echo "=== Command output ==="
               aws ssm get-command-invocation \
                 --command-id "$CMD_ID" \
                 --instance-id "$INSTANCE_ID" \
@@ -105,6 +163,7 @@ jobs:
                 --query "StandardOutputContent" \
                 --output text
 
+              echo "=== Error output ==="
               aws ssm get-command-invocation \
                 --command-id "$CMD_ID" \
                 --instance-id "$INSTANCE_ID" \
@@ -114,5 +173,11 @@ jobs:
                 
               exit 1
             fi
+            
+            if [ $i -eq 30 ]; then
+              echo "❌ Deployment timed out."
+              exit 1
+            fi
+            
             sleep 5
           done
