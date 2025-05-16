@@ -114,13 +114,22 @@ jobs:
           # Upload script to S3
           aws s3 cp deploy.sh s3://${{ env.S3_BUCKET }}/scripts/deploy-nodejs.sh
           
-          # Run deployment via SSM
+          # Create JSON file for SSM parameters
+          cat > ssm-params.json << EOF
+          {
+            "commands": [
+              "aws s3 cp s3://${{ env.S3_BUCKET }}/scripts/deploy-nodejs.sh /tmp/deploy-nodejs.sh",
+              "chmod +x /tmp/deploy-nodejs.sh",
+              "/tmp/deploy-nodejs.sh"
+            ]
+          }
+          EOF
+          
+          # Run deployment via SSM using the JSON parameters file
           CMD_ID=$(aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
-            --parameters commands=["aws s3 cp s3://${{ env.S3_BUCKET }}/scripts/deploy-nodejs.sh /tmp/deploy-nodejs.sh",
-                                  "chmod +x /tmp/deploy-nodejs.sh",
-                                  "/tmp/deploy-nodejs.sh"] \
+            --parameters file://ssm-params.json \
             --comment "Zero downtime Node.js app deploy and Nginx reload" \
             --region ${{ env.AWS_REGION }} \
             --query "Command.CommandId" \
@@ -130,14 +139,16 @@ jobs:
 
           # Wait for command completion and check status
           for i in {1..30}; do
+            # Try to get the status (may fail if command is still processing)
             STATUS=$(aws ssm get-command-invocation \
               --command-id "$CMD_ID" \
               --instance-id "$INSTANCE_ID" \
               --region ${{ env.AWS_REGION }} \
               --query "Status" \
-              --output text)
+              --output text 2>/dev/null || echo "Pending")
 
             echo "Command status: $STATUS"
+            
             if [ "$STATUS" = "Success" ]; then
               echo "✅ Deployment successful."
               
