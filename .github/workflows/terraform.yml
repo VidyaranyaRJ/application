@@ -4,7 +4,7 @@ on:
   push:
     branches: [nodejs]
     paths:
-      - 'nodejs-app/**'  # Only trigger when changes are made to the Node.js app
+      - nodejs/  
   workflow_dispatch:     # Allow manual trigger
 
 env:
