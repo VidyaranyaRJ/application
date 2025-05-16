@@ -3,7 +3,7 @@ const app = express();
 const port = 3000;
 
 app.get('/', (req, res) => {
-  res.send('Hello, World! - VJ1');
+  res.send('Hello, World! - VJ');
 });
 
 // app.listen(port, () => {
@@ -14,5 +14,3 @@ app.get('/', (req, res) => {
 app.listen(3000, '0.0.0.0', () => {
   console.log('Server running on port 3000');
 });
-
-
